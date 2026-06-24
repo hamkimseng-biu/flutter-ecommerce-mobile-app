@@ -1,11 +1,227 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/cart_controller.dart';
+import '../../services/firebase_firestore_service.dart';
 import '../../../config/app_theme.dart';
+import '../../../config/app_snack.dart';
 import '../../routes/app_routes.dart';
 
-class CheckoutScreen extends StatelessWidget {
+class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
+  @override
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends State<CheckoutScreen> {
+  final _firestoreService = FirebaseFirestoreService();
+  bool _placingOrder = false;
+  final RxInt payMethod = 0.obs;
+  List<Map<String, dynamic>> _addresses = [];
+  Map<String, dynamic>? _selectedAddress;
+  bool _loadingAddresses = true;
+  List<Map<String, dynamic>> _userCards = [];
+  List<Map<String, dynamic>> _userBanks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+    _loadPaymentMethods();
+  }
+
+  Future<void> _loadPaymentMethods() async {
+    try {
+      final cards = await _firestoreService.getCards();
+      final banks = await _firestoreService.getBankAccounts();
+      if (mounted)
+        setState(() {
+          _userCards = cards;
+          _userBanks = banks;
+        });
+    } catch (_) {}
+  }
+
+  String get _selectedPaymentLabel {
+    if (payMethod.value < _userCards.length) {
+      final c = _userCards[payMethod.value];
+      return '${c['brand']} •••• ${(c['number'] as String).substring((c['number'] as String).length - 4)}';
+    }
+    final bankIdx = payMethod.value - _userCards.length;
+    if (bankIdx >= 0 && bankIdx < _userBanks.length) {
+      final b = _userBanks[bankIdx];
+      return '${b['bankName']} •••• ${(b['accountNumber'] as String).length > 4 ? (b['accountNumber'] as String).substring((b['accountNumber'] as String).length - 4) : b['accountNumber']}';
+    }
+    return 'Cash on Delivery';
+  }
+
+  int get _codIndex => _userCards.length + _userBanks.length;
+
+  Future<void> _loadAddresses() async {
+    try {
+      final addrs = await _firestoreService.getAddresses();
+      if (addrs.isNotEmpty) {
+        setState(() {
+          _addresses = addrs;
+          _selectedAddress = addrs.firstWhere(
+            (a) => a['isDefault'] == true,
+            orElse: () => addrs.first,
+          );
+          _loadingAddresses = false;
+        });
+        return;
+      }
+    } catch (_) {}
+    setState(() => _loadingAddresses = false);
+  }
+
+  void _showAddressPicker() {
+    if (_addresses.isEmpty) {
+      AppSnack.info('No Addresses', 'Add an address in your profile first.');
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Address',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ..._addresses.map(
+              (a) => ListTile(
+                leading: Icon(
+                  a['label'] == 'Home'
+                      ? Icons.home_rounded
+                      : a['label'] == 'Office'
+                      ? Icons.business_rounded
+                      : Icons.location_on_rounded,
+                  color: _selectedAddress == a
+                      ? AppTheme.primaryColor
+                      : Colors.grey,
+                ),
+                title: Text(
+                  a['label'] ?? 'Address',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _selectedAddress == a ? AppTheme.primaryColor : null,
+                  ),
+                ),
+                subtitle: Text(
+                  '${a['street']}, ${a['city']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: _selectedAddress == a
+                    ? const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.primaryColor,
+                      )
+                    : null,
+                onTap: () {
+                  setState(() => _selectedAddress = a);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _placeOrder() async {
+    final cc = Get.find<CartController>();
+    if (_placingOrder || cc.cartItems.isEmpty) return;
+
+    setState(() => _placingOrder = true);
+
+    try {
+      final items = cc.cartItems
+          .map(
+            (item) => {
+              'name': item.name,
+              'image': item.image,
+              'price': item.price,
+              'quantity': item.quantity,
+              'size': item.selectedSize,
+              'color': item.selectedColor,
+            },
+          )
+          .toList();
+
+      await _firestoreService.createOrder(
+        items: items,
+        subtotal: cc.subtotal,
+        tax: cc.tax,
+        shipping: cc.shippingFee,
+        discount: cc.discount.value,
+        total: cc.total,
+        promoCode: cc.promoCode.value,
+        paymentMethod: _selectedPaymentLabel,
+      );
+
+      if (!mounted) return;
+      setState(() => _placingOrder = false);
+
+      Get.dialog(
+        AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 56)),
+              const SizedBox(height: 14),
+              const Text(
+                'Order Placed!',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Your order has been placed successfully.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF9E9EAA)),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  cc.clearCart();
+                  Get.offAllNamed(AppRoutes.main);
+                },
+                child: const Text('Back to Home'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _placingOrder = false);
+      AppSnack.error(
+        'Order Failed',
+        'Could not place order. Please try again.',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +229,7 @@ class CheckoutScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = Theme.of(context).cardColor;
     final surface2 = isDark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5);
-    final RxInt payMethod = 0.obs;
+    final promoCtl = TextEditingController();
 
     return Scaffold(
       appBar: AppBar(
@@ -52,7 +268,7 @@ class CheckoutScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Shipping
+              // Shipping Address
               _card(
                 bg,
                 Column(
@@ -74,32 +290,111 @@ class CheckoutScreen extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        const Text(
-                          'Change',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w500,
+                        GestureDetector(
+                          onTap: _showAddressPicker,
+                          child: const Text(
+                            'Change',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'John Doe',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    if (_loadingAddresses)
+                      const SizedBox(
+                        height: 32,
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
                       ),
-                    ),
-                    const Text(
-                      '123 Cluck Street, Hen House District\nPhnom Penh, Cambodia',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9E9EAA),
-                        height: 1.5,
+                    if (!_loadingAddresses && _selectedAddress == null)
+                      GestureDetector(
+                        onTap: () => Get.toNamed(AppRoutes.addresses),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withValues(
+                              alpha: 0.06,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.add_location_outlined,
+                                color: AppTheme.primaryColor,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Add a shipping address',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    if (!_loadingAddresses && _selectedAddress != null) ...[
+                      Text(
+                        _selectedAddress!['recipient'] ?? 'Valued Customer',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_selectedAddress!['phone'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9E9EAA),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_selectedAddress!['street']}, ${_selectedAddress!['city']}${(_selectedAddress!['province'] as String? ?? '').isNotEmpty ? ', ${_selectedAddress!['province']}' : ''} ${_selectedAddress!['zip'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9E9EAA),
+                          height: 1.4,
+                        ),
+                      ),
+                      if (_selectedAddress!['isDefault'] == true)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Default',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -298,6 +593,7 @@ class CheckoutScreen extends StatelessWidget {
                         children: [
                           Expanded(
                             child: TextField(
+                              controller: promoCtl,
                               onSubmitted: (v) => cc.applyPromo(v),
                               decoration: const InputDecoration(
                                 hintText: 'Enter code (try CHICKEN10)',
@@ -317,7 +613,7 @@ class CheckoutScreen extends StatelessWidget {
                           SizedBox(
                             width: 80,
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () => cc.applyPromo(promoCtl.text),
                               style: ElevatedButton.styleFrom(
                                 minimumSize: const Size(80, 44),
                                 padding: EdgeInsets.zero,
@@ -341,7 +637,7 @@ class CheckoutScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              // Payment
+              // Payment Method — dynamic from user's saved cards & banks
               _card(
                 bg,
                 Column(
@@ -355,81 +651,88 @@ class CheckoutScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    _pm(
-                      0,
-                      Icons.credit_card_rounded,
-                      'Credit / Debit Card',
-                      'Visa, Mastercard',
-                      payMethod,
-                      bg,
+                    // User's credit/debit cards
+                    ..._userCards.asMap().entries.map(
+                      (e) => _pm(
+                        e.key,
+                        Icons.credit_card_rounded,
+                        '${e.value['brand']?.toString().toUpperCase() ?? 'Card'} •••• ${(e.value['number'] as String).substring((e.value['number'] as String).length - 4)}',
+                        e.value['holder'] ?? '',
+                        payMethod,
+                        bg,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    _pm(
-                      1,
-                      Icons.account_balance_wallet_rounded,
-                      'ABA / Wing / TrueMoney',
-                      'Local e-wallets',
-                      payMethod,
-                      bg,
+                    if (_userCards.isNotEmpty) const SizedBox(height: 6),
+                    // User's bank accounts
+                    ..._userBanks.asMap().entries.map(
+                      (e) => _pm(
+                        _userCards.length + e.key,
+                        Icons.account_balance_rounded,
+                        e.value['bankName'] ?? 'Bank Account',
+                        '•••• ${(e.value['accountNumber'] as String).length > 4 ? (e.value['accountNumber'] as String).substring((e.value['accountNumber'] as String).length - 4) : e.value['accountNumber']}',
+                        payMethod,
+                        bg,
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    if (_userBanks.isNotEmpty) const SizedBox(height: 6),
+                    // Cash on Delivery (always available)
                     _pm(
-                      2,
+                      _codIndex,
                       Icons.money_rounded,
                       'Cash on Delivery',
                       'Pay when you receive',
                       payMethod,
                       bg,
                     ),
+                    if (_userCards.isEmpty && _userBanks.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: GestureDetector(
+                          onTap: () => Get.toNamed(AppRoutes.paymentMethods),
+                          child: Text(
+                            'Add a card or bank account →',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  Get.dialog(
-                    AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🎉', style: TextStyle(fontSize: 56)),
-                          const SizedBox(height: 14),
-                          const Text(
-                            'Order Placed!',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  onPressed: _placingOrder ? null : _placeOrder,
+                  icon: _placingOrder
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Your order has been placed successfully.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF9E9EAA)),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: () {
-                              cc.clearCart();
-                              Get.offAllNamed(AppRoutes.main);
-                            },
-                            child: const Text('Back to Home'),
-                          ),
-                        ],
-                      ),
+                        )
+                      : const Icon(Icons.shopping_bag_rounded, size: 18),
+                  label: Text(
+                    _placingOrder
+                        ? 'Placing Order...'
+                        : 'Place Order - \$${cc.total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                  );
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.shopping_bag_rounded, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Place Order - \$${cc.total.toStringAsFixed(2)}'),
-                  ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

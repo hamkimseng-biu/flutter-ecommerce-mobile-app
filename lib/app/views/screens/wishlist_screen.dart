@@ -13,6 +13,7 @@ class WishlistScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final wc = Get.find<WishlistController>();
     final cc = Get.find<CartController>();
+    Future.microtask(() => wc.loadWishlist());
 
     return Scaffold(
       appBar: AppBar(
@@ -66,7 +67,7 @@ class WishlistScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () => Get.offAllNamed(AppRoutes.main),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(200, 50),
                       shape: RoundedRectangleBorder(
@@ -118,42 +119,49 @@ class WishlistScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: GridView.builder(
-                controller: wc.scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.62,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: wc.wishlistItems.length,
-                itemBuilder: (ctx, i) {
-                  final p = wc.wishlistItems[i];
-                  return Dismissible(
-                    key: Key(p.id),
-                    direction: DismissDirection.endToStart,
-                    onDismissed: (_) => wc.toggleWishlist(p),
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorColor.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.heart_broken,
-                        color: Colors.white,
-                      ),
-                    ),
-                    child: ProductCard(
-                      product: p,
-                      onTap: () =>
-                          Get.toNamed(AppRoutes.productDetail, arguments: p),
-                      onAddToCart: () => cc.addToCart(p),
-                    ),
-                  );
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  // Wishlist refreshed via controller
                 },
+                color: AppTheme.primaryColor,
+                child: GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  controller: wc.scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.62,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: wc.wishlistItems.length,
+                  itemBuilder: (ctx, i) {
+                    final p = wc.wishlistItems[i];
+                    return Dismissible(
+                      key: Key(p.id),
+                      direction: DismissDirection.endToStart,
+                      onDismissed: (_) => wc.toggleWishlist(p),
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.heart_broken,
+                          color: Colors.white,
+                        ),
+                      ),
+                      child: ProductCard(
+                        product: p,
+                        onTap: () =>
+                            Get.toNamed(AppRoutes.productDetail, arguments: p),
+                        onAddToCart: () => cc.addToCart(p),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],

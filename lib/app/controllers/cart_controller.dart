@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/product_model.dart';
 import '../models/cart_item_model.dart';
+import '../services/firebase_firestore_service.dart';
+import '../../config/app_snack.dart';
 
 class CartController extends GetxController {
+  final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
+
   final RxList<CartItemModel> cartItems = <CartItemModel>[].obs;
   final RxString promoCode = ''.obs;
   final RxDouble discount = 0.0.obs;
@@ -33,127 +37,108 @@ class CartController extends GetxController {
   double get tax => subtotal * taxRate;
   double get total => subtotal + tax + shippingFee - discount.value;
 
-  void addToCart(
+  Future<void> addToCart(
     ProductModel product, {
     String size = 'M',
     String color = '',
     int quantity = 1,
-  }) {
+  }) async {
     final existingIdx = cartItems.indexWhere(
       (item) => item.productId == product.id,
     );
     if (existingIdx != -1) {
       cartItems[existingIdx].quantity += quantity;
       cartItems.refresh();
+      // Sync to Firestore
+      try {
+        await _firestoreService.updateCartQuantity(
+          product.id,
+          cartItems[existingIdx].quantity,
+        );
+      } catch (_) {}
     } else {
-      cartItems.add(
-        CartItemModel(
-          productId: product.id,
-          name: product.name,
-          image: product.images.isNotEmpty ? product.images[0] : '',
-          price: product.effectivePrice,
-          selectedSize: size,
-          selectedColor: color,
-          quantity: quantity,
-        ),
+      final item = CartItemModel(
+        productId: product.id,
+        name: product.name,
+        image: product.images.isNotEmpty ? product.images[0] : '',
+        price: product.effectivePrice,
+        selectedSize: size,
+        selectedColor: color,
+        quantity: quantity,
       );
+      cartItems.add(item);
+      // Sync to Firestore
+      try {
+        await _firestoreService.addToCart(item);
+      } catch (_) {}
     }
-    _showSnack(
+    AppSnack.success(
       'Added to Cart',
       quantity > 1 ? '$quantity × ${product.name}' : product.name,
-      Icons.check_circle_rounded,
-      const Color(0xFF2E7D32),
     );
   }
 
-  void removeFromCart(String productId) {
+  Future<void> removeFromCart(String productId) async {
     cartItems.removeWhere((item) => item.productId == productId);
+    // Sync to Firestore
+    try {
+      await _firestoreService.removeFromCart(productId);
+    } catch (_) {}
   }
 
-  void incrementQuantity(int index) {
+  Future<void> incrementQuantity(int index) async {
     cartItems[index].quantity++;
     cartItems.refresh();
+    // Sync to Firestore
+    try {
+      await _firestoreService.updateCartQuantity(
+        cartItems[index].productId,
+        cartItems[index].quantity,
+      );
+    } catch (_) {}
   }
 
-  void decrementQuantity(int index) {
+  Future<void> decrementQuantity(int index) async {
     if (cartItems[index].quantity > 1) {
       cartItems[index].quantity--;
       cartItems.refresh();
+      // Sync to Firestore
+      try {
+        await _firestoreService.updateCartQuantity(
+          cartItems[index].productId,
+          cartItems[index].quantity,
+        );
+      } catch (_) {}
     }
   }
 
-  void applyPromo(String code) {
-    if (code.toUpperCase() == 'CHICKEN10') {
-      promoCode.value = code;
-      discount.value = subtotal * 0.10;
-      _showSnack(
+  Future<void> applyPromo(String code) async {
+    if (code.trim().isEmpty) return;
+
+    // Validate against Firestore promo_codes collection
+    final promo = await _firestoreService.validatePromoCode(code);
+    if (promo != null) {
+      promoCode.value = promo['code'] as String;
+      final pct = (promo['discountPercent'] as num).toDouble();
+      discount.value = subtotal * (pct / 100.0);
+      AppSnack.success(
         'Promo Applied!',
-        '10% discount applied to your order.',
-        Icons.local_offer_rounded,
-        const Color(0xFF2E7D32),
+        '${pct.toInt()}% discount applied to your order.',
       );
     } else {
-      _showSnack(
-        'Invalid Code',
-        'Please enter a valid promo code.',
-        Icons.error_outline_rounded,
-        const Color(0xFFE53935),
-      );
+      promoCode.value = '';
+      discount.value = 0.0;
+      AppSnack.error('Invalid Code', 'Please enter a valid promo code.');
     }
   }
 
-  void clearCart() {
+  Future<void> clearCart() async {
     cartItems.clear();
     promoCode.value = '';
     discount.value = 0.0;
-  }
-
-  void _showSnack(String title, String message, IconData icon, Color color) {
-    Get.snackbar(
-      '',
-      '',
-      titleText: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-      messageText: Text(
-        message,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.85),
-          fontSize: 13,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      snackPosition: SnackPosition.TOP,
-      margin: const EdgeInsets.all(12),
-      borderRadius: 14,
-      backgroundColor: color,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 2),
-      isDismissible: true,
-      dismissDirection: DismissDirection.horizontal,
-      forwardAnimationCurve: Curves.easeOutBack,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-    );
+    // Sync to Firestore
+    try {
+      await _firestoreService.clearCart();
+    } catch (_) {}
   }
 }

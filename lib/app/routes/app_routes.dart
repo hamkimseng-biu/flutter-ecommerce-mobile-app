@@ -1,6 +1,11 @@
 import 'package:get/get.dart';
 import '../views/screens/splash_screen.dart';
 import '../views/screens/main_screen.dart';
+import '../views/screens/login_screen.dart';
+import '../views/screens/register_screen.dart';
+import '../views/screens/edit_profile_screen.dart';
+import '../views/screens/order_detail_screen.dart';
+import '../views/screens/admin_products_screen.dart';
 
 import '../views/screens/shop_screen.dart';
 import '../views/screens/product_detail_screen.dart';
@@ -10,10 +15,19 @@ import '../views/screens/profile_screen.dart';
 import '../views/screens/search_screen.dart';
 import '../views/screens/wishlist_screen.dart';
 import '../views/screens/profile_sub_screens.dart';
+import '../views/screens/add_edit_address_screen.dart';
+import '../views/screens/add_edit_card_screen.dart';
+import '../views/screens/add_edit_product_screen.dart';
+import '../views/screens/add_edit_shop_screen.dart';
+import '../views/screens/add_edit_bank_screen.dart';
+import '../views/screens/forgot_password_screen.dart';
 import '../controllers/theme_controller.dart';
 
 class AppRoutes {
   static const String splash = '/';
+  static const String login = '/login';
+  static const String forgotPassword = '/forgot-password';
+  static const String register = '/register';
   static const String main = '/main';
   static const String home = '/home';
   static const String shop = '/shop';
@@ -21,19 +35,42 @@ class AppRoutes {
   static const String cart = '/cart';
   static const String checkout = '/checkout';
   static const String profile = '/profile';
+  static const String editProfile = '/edit-profile';
+  static const String orderDetail = '/order-detail';
   static const String search = '/search';
   static const String wishlist = '/wishlist';
   static const String orders = '/orders';
   static const String addresses = '/addresses';
+  static const String addEditAddress = '/add-edit-address';
   static const String paymentMethods = '/payment-methods';
+  static const String addCard = '/add-card';
+  static const String addBank = '/add-bank';
   static const String settings = '/settings';
   static const String notifications = '/notifications';
   static const String helpCenter = '/help-center';
+  static const String adminProducts = '/admin-products';
+  static const String addEditProduct = '/add-edit-product';
+  static const String addEditShop = '/add-edit-shop';
 
   static List<GetPage> pages = [
     GetPage(
       name: splash,
       page: () => const SplashScreen(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: login,
+      page: () => const LoginScreen(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: forgotPassword,
+      page: () => const ForgotPasswordScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: register,
+      page: () => const RegisterScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
@@ -70,6 +107,16 @@ class AppRoutes {
       transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
+      name: editProfile,
+      page: () => const EditProfileScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: orderDetail,
+      page: () => const OrderDetailScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
       name: search,
       page: () => const SearchScreen(),
       transition: Transition.fadeIn,
@@ -90,8 +137,23 @@ class AppRoutes {
       transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
+      name: addEditAddress,
+      page: () => const AddEditAddressScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
       name: paymentMethods,
       page: () => const PaymentMethodsScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: addCard,
+      page: () => const AddEditCardScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: addBank,
+      page: () => const AddEditBankScreen(),
       transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
@@ -107,6 +169,21 @@ class AppRoutes {
     GetPage(
       name: helpCenter,
       page: () => const HelpCenterScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: adminProducts,
+      page: () => const AdminProductsScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: addEditProduct,
+      page: () => const AddEditProductScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: addEditShop,
+      page: () => const AddEditShopScreen(),
       transition: Transition.rightToLeftWithFade,
     ),
   ];

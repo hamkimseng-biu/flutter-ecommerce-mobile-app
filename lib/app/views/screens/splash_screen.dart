@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../config/app_theme.dart';
@@ -33,10 +34,22 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
     _ctrl.forward();
-    Future.delayed(
-      const Duration(seconds: 3),
-      () => Get.offAllNamed(AppRoutes.main),
-    );
+    _navigateAfterDelay();
+  }
+
+  Future<void> _navigateAfterDelay() async {
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+
+    // Check Firebase auth state
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // User is signed in, go to main
+      Get.offAllNamed(AppRoutes.main);
+    } else {
+      // User is not signed in, go to login
+      Get.offAllNamed(AppRoutes.login);
+    }
   }
 
   @override

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../controllers/theme_controller.dart';
 import '../../controllers/auth_controller.dart';
 import '../../../config/app_theme.dart';
+import '../../../config/app_snack.dart';
 import '../../routes/app_routes.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -11,7 +11,6 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Get.find<AuthController>();
-    final themeCtrl = Get.find<ThemeController>();
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -40,30 +39,52 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 10,
-                            ),
-                          ],
+                  GestureDetector(
+                    onTap: () => Get.toNamed(AppRoutes.editProfile),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Obx(
+                            () => auth.userPhotoURL.value.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(26),
+                                    child: Image.network(
+                                      auth.userPhotoURL.value,
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Center(
+                                            child: Text(
+                                              '🐔',
+                                              style: TextStyle(fontSize: 38),
+                                            ),
+                                          ),
+                                    ),
+                                  )
+                                : const Center(
+                                    child: Text(
+                                      '🐔',
+                                      style: TextStyle(fontSize: 38),
+                                    ),
+                                  ),
+                          ),
                         ),
-                        child: const Center(
-                          child: Text('🐔', style: TextStyle(fontSize: 38)),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: () => _editProfile(context, auth),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
                           child: Container(
                             padding: const EdgeInsets.all(5),
                             decoration: const BoxDecoration(
@@ -77,39 +98,31 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Obx(
                     () => Text(
-                      auth.userName.value,
+                      auth.userName.value.isNotEmpty
+                          ? auth.userName.value
+                          : 'Chicken Lover',
                       style: const TextStyle(
-                        fontSize: 19,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Obx(
                     () => Text(
                       auth.userEmail.value,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _stat('12', 'Orders'),
-                      _stat('3', 'Pending'),
-                      _stat('45', 'Points'),
-                      _stat('2', 'Vouchers'),
-                    ],
                   ),
                 ],
               ),
@@ -117,14 +130,14 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ═══ QUICK ACTIONS ═══
+            // ═══ QUICK ACTIONS — 2 rows to avoid overflow ═══
             Row(
               children: [
                 Expanded(
                   child: _qAct(
                     context,
                     Icons.receipt_long_outlined,
-                    'My Orders',
+                    'Orders',
                     () => Get.toNamed(AppRoutes.orders),
                   ),
                 ),
@@ -133,11 +146,15 @@ class ProfileScreen extends StatelessWidget {
                   child: _qAct(
                     context,
                     Icons.location_on_outlined,
-                    'Addresses',
+                    'Address',
                     () => Get.toNamed(AppRoutes.addresses),
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 Expanded(
                   child: _qAct(
                     context,
@@ -160,49 +177,52 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ═══ MY ACCOUNT ═══
-            _section(context, 'My Account', [
+            // ═══ ACCOUNT ═══
+            _section(context, 'Account', [
               _item(
                 context,
-                Icons.shopping_bag_outlined,
-                'My Orders',
-                'Track, return, or buy again',
-                () => Get.toNamed(AppRoutes.orders),
-                badge: const _Badge('12'),
+                Icons.person_outline,
+                'Edit Profile',
+                'Name, photo, phone number',
+                () => Get.toNamed(AppRoutes.editProfile),
               ),
               _item(
                 context,
                 Icons.card_giftcard_outlined,
-                'Vouchers & Rewards',
-                '2 active vouchers · 45 points',
-                () {},
-              ),
-              _item(
-                context,
-                Icons.history_outlined,
-                'Recently Viewed',
-                'Your browsing history',
-                () {},
+                'Loyalty Points',
+                'Earn 1 point per \$1 spent',
+                () {
+                  AppSnack.info(
+                    'Coming Soon',
+                    'Loyalty rewards coming in the next update!',
+                  );
+                },
+                badge: _buildPointsBadge(context),
               ),
               _item(
                 context,
                 Icons.share_outlined,
                 'Refer & Earn',
                 'Invite friends, get \$5 credit',
-                () {},
-              ),
-            ]),
-
-            const SizedBox(height: 12),
-
-            // ═══ SETTINGS ═══
-            _section(context, 'Settings', [
-              _item(
-                context,
-                Icons.person_outline,
-                'Edit Profile',
-                'Name, email, photo',
-                () => _editProfile(context, auth),
+                () => _showReferralDialog(context),
+                badge: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'CHICKEN10',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.successColor,
+                    ),
+                  ),
+                ),
               ),
               _item(
                 context,
@@ -210,39 +230,6 @@ class ProfileScreen extends StatelessWidget {
                 'Notifications',
                 'Manage your alerts',
                 () => Get.toNamed(AppRoutes.notifications),
-                badge: const _Badge('3', red: true),
-              ),
-              _item(
-                context,
-                Icons.dark_mode_outlined,
-                'Dark Mode',
-                themeCtrl.isDarkMode.value
-                    ? 'Currently enabled'
-                    : 'Currently disabled',
-                () => themeCtrl.toggleTheme(),
-                trailing: Obx(
-                  () => Switch(
-                    value: themeCtrl.isDarkMode.value,
-                    onChanged: (_) => themeCtrl.toggleTheme(),
-                    activeTrackColor: AppTheme.primaryColor.withValues(
-                      alpha: 0.4,
-                    ),
-                  ),
-                ),
-              ),
-              _item(
-                context,
-                Icons.language_outlined,
-                'Language',
-                'English',
-                () {},
-              ),
-              _item(
-                context,
-                Icons.settings_outlined,
-                'App Settings',
-                'Preferences & data',
-                () => Get.toNamed(AppRoutes.settings),
               ),
             ]),
 
@@ -262,14 +249,14 @@ class ProfileScreen extends StatelessWidget {
                 Icons.chat_bubble_outline,
                 'Contact Us',
                 "We're here 24/7",
-                () {},
+                () => _showContactDialog(context),
               ),
               _item(
                 context,
                 Icons.info_outline,
                 'About Tiny Chicken',
                 'Version 1.0.0 · Build 2026',
-                () {},
+                () => _showAboutDialog(context),
               ),
             ]),
 
@@ -304,27 +291,6 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // ── Widgets ──
-  Widget _stat(String val, String label) => Column(
-    children: [
-      Text(
-        val,
-        style: const TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-      const SizedBox(height: 2),
-      Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          color: Colors.white.withValues(alpha: 0.8),
-        ),
-      ),
-    ],
-  );
-
   Widget _qAct(
     BuildContext ctx,
     IconData icon,
@@ -447,49 +413,194 @@ class ProfileScreen extends StatelessWidget {
     ),
   );
 
-  // ── Dialogs ──
-  void _editProfile(BuildContext ctx, AuthController auth) {
-    final nameCtrl = TextEditingController(text: auth.userName.value);
-    final emailCtrl = TextEditingController(text: auth.userEmail.value);
+  // ── Support Dialogs ──
+  void _showContactDialog(BuildContext context) {
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        title: const Row(
+          children: [
+            Icon(Icons.chat_bubble_outlined, color: AppTheme.primaryColor),
+            SizedBox(width: 10),
+            Text(
+              'Contact Us',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We\'re here to help! Reach us through:',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            _ContactRow(
+              Icons.email_outlined,
+              'Email',
+              'support@tinychicken.com',
+            ),
+            SizedBox(height: 10),
+            _ContactRow(Icons.phone_outlined, 'Phone', '+855 23 456 789'),
+            SizedBox(height: 10),
+            _ContactRow(Icons.access_time, 'Hours', 'Mon–Sat, 8AM–8PM'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              AppSnack.success(
+                'Message Sent',
+                "We'll get back to you within 24 hours.",
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text(
+              'Send Message',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 4),
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.person_outline),
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Center(
+                child: Text('🐔', style: TextStyle(fontSize: 34)),
               ),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              keyboardType: TextInputType.emailAddress,
+            const SizedBox(height: 16),
+            const Text(
+              'Tiny Chicken',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Small prices, big style!',
+              style: TextStyle(fontSize: 14, color: Color(0xFF9E9EAA)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Version 1.0.0 (Build 2026)\n\n'
+              'Tiny Chicken is your one-stop shop for trendy fashion, electronics, and lifestyle products at unbeatable prices.\n\n'
+              'Made with ❤️ in Cambodia',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, height: 1.6),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          ElevatedButton(
+          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointsBadge(BuildContext ctx) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppTheme.secondaryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        '125 pts',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.secondaryColor,
+        ),
+      ),
+    );
+  }
+
+  void _showReferralDialog(BuildContext ctx) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.share_outlined, color: AppTheme.primaryColor),
+            SizedBox(width: 10),
+            Text(
+              'Refer & Earn',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Share your referral code and earn!',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  'CHICKEN10',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'You get \$5 credit. Your friend gets 10% off their first order.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Color(0xFF9E9EAA)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+          ElevatedButton.icon(
             onPressed: () {
-              auth.userName.value = nameCtrl.text;
-              auth.userEmail.value = emailCtrl.text;
+              AppSnack.success('Copied!', 'Referral code copied to clipboard.');
               Get.back();
-              _snack('Profile updated!', AppTheme.successColor);
             },
-            child: const Text('Save'),
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copy Code'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
           ),
         ],
       ),
@@ -511,9 +622,11 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Get.back();
-              _snack('Logged out', AppTheme.primaryColor);
+              final auth = Get.find<AuthController>();
+              await auth.logout();
+              Get.offAllNamed(AppRoutes.login);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.errorColor,
@@ -524,49 +637,26 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _snack(String msg, Color c) => Get.snackbar(
-    '',
-    '',
-    titleText: Text(
-      msg,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-    messageText: const SizedBox.shrink(),
-    snackPosition: SnackPosition.TOP,
-    margin: const EdgeInsets.all(12),
-    borderRadius: 14,
-    backgroundColor: c,
-    duration: const Duration(seconds: 2),
-    forwardAnimationCurve: Curves.easeOutBack,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-  );
 }
 
-class _Badge extends StatelessWidget {
-  final String text;
-  final bool red;
-  const _Badge(this.text, {this.red = false});
+class _ContactRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _ContactRow(this.icon, this.label, this.value);
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-    decoration: BoxDecoration(
-      color: (red ? AppTheme.errorColor : AppTheme.primaryColor).withValues(
-        alpha: 0.1,
-      ),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 10,
-        color: red ? AppTheme.errorColor : AppTheme.primaryColor,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppTheme.primaryColor),
+        const SizedBox(width: 10),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: const TextStyle(fontSize: 13)),
+      ],
+    );
+  }
 }

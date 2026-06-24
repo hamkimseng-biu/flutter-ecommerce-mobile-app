@@ -2,6 +2,7 @@ class SellerModel {
   final String id;
   final String name;
   final String avatar;
+  final String logoUrl;
   final String banner;
   final String description;
   final double rating;
@@ -14,6 +15,7 @@ class SellerModel {
     required this.id,
     required this.name,
     required this.avatar,
+    this.logoUrl = '',
     this.banner = '',
     this.description = '',
     this.rating = 0.0,

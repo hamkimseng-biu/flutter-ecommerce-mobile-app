@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "924881312154",
+    "project_id": "tiny-chicken",
+    "storage_bucket": "tiny-chicken.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:924881312154:android:0df09440b733bfb4edc223",
+        "android_client_info": {
+          "package_name": "com.tinychicken.tiny_chicken"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "924881312154-ca3u3dmlflm0b0sgvnksoitcsgjhqqst.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tinychicken.tiny_chicken",
+            "certificate_hash": "5a427c441872376b9f421b3e697da769ee1b9292"
+          }
+        },
+        {
+          "client_id": "924881312154-7gaeutrartpi7e29o7n6gni7os93b2uq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWa0ISo1jIbS7ozxwqMbdTH4jh6Cb2T-M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "924881312154-7gaeutrartpi7e29o7n6gni7os93b2uq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

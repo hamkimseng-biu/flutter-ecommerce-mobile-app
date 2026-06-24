@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ProductModel {
   final String id;
   final String name;
@@ -18,6 +20,8 @@ class ProductModel {
   final int soldCount;
   final bool isFlashSale;
   final double flashSalePrice;
+  final DateTime? saleEndsAt;
+  final bool isFeatured;
 
   ProductModel({
     required this.id,
@@ -39,6 +43,8 @@ class ProductModel {
     this.soldCount = 0,
     this.isFlashSale = false,
     this.flashSalePrice = 0.0,
+    this.saleEndsAt,
+    this.isFeatured = false,
   });
 
   double get effectivePrice =>
@@ -68,6 +74,8 @@ class ProductModel {
     int? soldCount,
     bool? isFlashSale,
     double? flashSalePrice,
+    DateTime? saleEndsAt,
+    bool? isFeatured,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -89,6 +97,62 @@ class ProductModel {
       soldCount: soldCount ?? this.soldCount,
       isFlashSale: isFlashSale ?? this.isFlashSale,
       flashSalePrice: flashSalePrice ?? this.flashSalePrice,
+      saleEndsAt: saleEndsAt ?? this.saleEndsAt,
+      isFeatured: isFeatured ?? this.isFeatured,
     );
+  }
+
+  // ── Firestore ──
+
+  factory ProductModel.fromFirestore(DocumentSnapshot<Object?> doc) {
+    final data = doc.data()! as Map<String, dynamic>;
+    return ProductModel(
+      id: doc.id,
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      price: (data['price'] ?? 0).toDouble(),
+      originalPrice: (data['originalPrice'] ?? 0).toDouble(),
+      images: List<String>.from(data['images'] ?? []),
+      category: data['category'] ?? '',
+      rating: (data['rating'] ?? 0).toDouble(),
+      reviewCount: data['reviewCount'] ?? 0,
+      sizes: List<String>.from(data['sizes'] ?? ['S', 'M', 'L', 'XL']),
+      colors: List<String>.from(data['colors'] ?? []),
+      isFavorite: data['isFavorite'] ?? false,
+      stock: data['stock'] ?? 10,
+      sellerId: data['sellerId'] ?? '',
+      sellerName: data['sellerName'] ?? 'Tiny Chicken Official',
+      sellerAvatar: data['sellerAvatar'] ?? '',
+      soldCount: data['soldCount'] ?? 0,
+      isFlashSale: data['isFlashSale'] ?? false,
+      flashSalePrice: (data['flashSalePrice'] ?? 0).toDouble(),
+      saleEndsAt: (data['saleEndsAt'] as Timestamp?)?.toDate(),
+      isFeatured: data['isFeatured'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'name': name,
+      'description': description,
+      'price': price,
+      'originalPrice': originalPrice,
+      'images': images,
+      'category': category,
+      'rating': rating,
+      'reviewCount': reviewCount,
+      'sizes': sizes,
+      'colors': colors,
+      'isFavorite': isFavorite,
+      'stock': stock,
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'sellerAvatar': sellerAvatar,
+      'soldCount': soldCount,
+      'isFlashSale': isFlashSale,
+      'flashSalePrice': flashSalePrice,
+      'saleEndsAt': saleEndsAt != null ? Timestamp.fromDate(saleEndsAt!) : null,
+      'isFeatured': isFeatured,
+    };
   }
 }

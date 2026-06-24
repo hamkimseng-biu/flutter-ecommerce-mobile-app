@@ -7,9 +7,9 @@ class ThemeController extends GetxController {
 
   void toggleTheme() {
     isDarkMode.value = !isDarkMode.value;
-    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
   }
 
+  // No need to call Get.changeThemeMode — main.dart watches isDarkMode via Obx
   ThemeData get currentTheme =>
       isDarkMode.value ? AppTheme.darkTheme : AppTheme.lightTheme;
 }

@@ -60,9 +60,11 @@ class CartScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 ElevatedButton(
-                  onPressed: () => Get.back(),
+                  onPressed: () => Get.offAllNamed(AppRoutes.main),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(180, 50),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -303,6 +305,8 @@ class CartScreen extends StatelessWidget {
                       onPressed: () => Get.toNamed(AppRoutes.checkout),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 54),
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),

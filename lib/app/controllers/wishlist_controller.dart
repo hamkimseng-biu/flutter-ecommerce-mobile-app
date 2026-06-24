@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
+import '../services/firebase_firestore_service.dart';
+import '../../config/app_snack.dart';
 
 class WishlistController extends GetxController {
+  final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   final RxList<ProductModel> wishlistItems = <ProductModel>[].obs;
   final ScrollController scrollController = ScrollController();
+  bool _initialized = false;
 
   void scrollToTop() {
     if (scrollController.hasClients) {
@@ -22,31 +29,44 @@ class WishlistController extends GetxController {
     super.onClose();
   }
 
+  /// Load wishlist from Firestore and fetch full product data
+  Future<void> loadWishlist() async {
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      final ids = await _firestoreService.getWishlistIds();
+      if (ids.isEmpty) return;
+      // Fetch products in batches
+      final products = <ProductModel>[];
+      for (final id in ids) {
+        try {
+          final doc = await _firestore.collection('products').doc(id).get();
+          if (doc.exists) {
+            products.add(ProductModel.fromFirestore(doc));
+          }
+        } catch (_) {}
+      }
+      wishlistItems.assignAll(products);
+    } catch (_) {}
+  }
+
   bool isInWishlist(String productId) {
     return wishlistItems.any((p) => p.id == productId);
   }
 
-  void toggleWishlist(ProductModel product) {
+  Future<void> toggleWishlist(ProductModel product) async {
     if (isInWishlist(product.id)) {
       wishlistItems.removeWhere((p) => p.id == product.id);
-      Get.snackbar(
-        'Removed',
-        '${product.name} removed from wishlist.',
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFF6C757D),
-        colorText: Colors.white,
-      );
+      try {
+        await _firestoreService.removeFromWishlist(product.id);
+      } catch (_) {}
+      AppSnack.info('Removed', '${product.name} removed from wishlist.');
     } else {
       wishlistItems.add(product.copyWith(isFavorite: true));
-      Get.snackbar(
-        'Added!',
-        '${product.name} added to wishlist.',
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFFFF6B35),
-        colorText: Colors.white,
-      );
+      try {
+        await _firestoreService.addToWishlist(product.id);
+      } catch (_) {}
+      AppSnack.success('Added!', '${product.name} added to wishlist.');
     }
   }
 }

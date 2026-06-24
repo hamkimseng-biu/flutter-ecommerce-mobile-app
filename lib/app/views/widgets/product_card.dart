@@ -191,6 +191,8 @@ class ProductCard extends StatelessWidget {
                             children: [
                               Text(
                                 '\$${product.effectivePrice.toStringAsFixed(2)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
@@ -212,7 +214,7 @@ class ProductCard extends StatelessWidget {
                             ],
                           ),
                           GestureDetector(
-                            onTap: onAddToCart,
+                            onTap: onTap,
                             child: Container(
                               padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(

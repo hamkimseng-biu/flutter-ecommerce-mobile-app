@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../models/product_model.dart';
 import '../../controllers/product_controller.dart';
 import '../../controllers/cart_controller.dart';
 import '../../controllers/home_controller.dart';
+import '../../services/firebase_firestore_service.dart';
 import '../../../config/app_theme.dart';
 import '../widgets/product_card.dart';
+import '../widgets/flash_countdown.dart';
 import '../../routes/app_routes.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -194,18 +197,25 @@ class HomeScreen extends StatelessWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        cat.name,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: active
-                                              ? FontWeight.w600
-                                              : FontWeight.w400,
-                                          color: active
-                                              ? AppTheme.primaryColor
-                                              : (isDark
-                                                    ? AppTheme.darkTextSecondary
-                                                    : const Color(0xFF666666)),
+                                      Flexible(
+                                        child: Text(
+                                          cat.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: active
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                            color: active
+                                                ? AppTheme.primaryColor
+                                                : (isDark
+                                                      ? AppTheme
+                                                            .darkTextSecondary
+                                                      : const Color(
+                                                          0xFF666666,
+                                                        )),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -265,26 +275,15 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          _tb('12'),
-                          const Text(
-                            ':',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          _tb('34'),
-                          const Text(
-                            ':',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          _tb('56'),
+                          _buildFlashCountdown(items),
                           const Spacer(),
                           GestureDetector(
-                            onTap: () {},
+                            onTap: () => Get.toNamed(
+                              AppRoutes.shop,
+                              arguments: pc.sellers.isNotEmpty
+                                  ? pc.sellers.first
+                                  : null,
+                            ),
                             child: const Text(
                               'More',
                               style: TextStyle(
@@ -329,6 +328,11 @@ class HomeScreen extends StatelessWidget {
               }),
             ),
 
+            // ═══ RECENTLY VIEWED ═══
+            SliverToBoxAdapter(
+              child: _RecentlyViewedSection(pc: pc, cc: cc, isDark: isDark),
+            ),
+
             SliverToBoxAdapter(
               child: Obx(() {
                 final sellers = pc.sellers;
@@ -349,7 +353,14 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () {},
+                            onTap: () {
+                              if (pc.sellers.isNotEmpty) {
+                                Get.toNamed(
+                                  AppRoutes.shop,
+                                  arguments: pc.sellers.first,
+                                );
+                              }
+                            },
                             child: const Text(
                               'See All',
                               style: TextStyle(
@@ -392,12 +403,26 @@ class HomeScreen extends StatelessWidget {
                                             )
                                           : null,
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        s.avatar,
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
-                                    ),
+                                    child: s.logoUrl.isNotEmpty
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            child: Image.network(
+                                              s.logoUrl,
+                                              fit: BoxFit.cover,
+                                              width: 48,
+                                              height: 48,
+                                            ),
+                                          )
+                                        : Center(
+                                            child: Text(
+                                              s.avatar,
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                              ),
+                                            ),
+                                          ),
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
@@ -424,12 +449,34 @@ class HomeScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: Obx(() {
                 if (pc.isLoading.value)
-                  return const Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppTheme.primaryColor,
-                      ),
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 3,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Guess You Like',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _shimmerGrid(),
+                      ],
                     ),
                   );
                 final items = pc.filteredProducts;
@@ -567,19 +614,128 @@ class HomeScreen extends StatelessWidget {
     ),
   );
 
-  Widget _tb(String t) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-    decoration: BoxDecoration(
-      color: Colors.black87,
-      borderRadius: BorderRadius.circular(3),
+  Widget _buildFlashCountdown(List<ProductModel> items) {
+    // Use the earliest ending flash sale, or default to 24h from now
+    DateTime? endTime;
+    for (final p in items) {
+      if (p.saleEndsAt != null) {
+        if (endTime == null || p.saleEndsAt!.isBefore(endTime)) {
+          endTime = p.saleEndsAt;
+        }
+      }
+    }
+    endTime ??= DateTime.now().add(const Duration(hours: 24));
+    return FlashCountdown(endTime: endTime);
+  }
+
+  // ── Shimmer placeholder for loading ──
+  Widget _shimmerGrid() => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      childAspectRatio: 0.68,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
     ),
-    child: Text(
-      t,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
+    itemCount: 6,
+    itemBuilder: (_, __) => Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
   );
+}
+
+// ═══════════════════════════════════════════════════════
+// RECENTLY VIEWED SECTION (inside HomeScreen)
+// ═══════════════════════════════════════════════════════
+class _RecentlyViewedSection extends StatefulWidget {
+  final ProductController pc;
+  final CartController cc;
+  final bool isDark;
+  const _RecentlyViewedSection({
+    required this.pc,
+    required this.cc,
+    required this.isDark,
+  });
+
+  @override
+  State<_RecentlyViewedSection> createState() => _RecentlyViewedSectionState();
+}
+
+class _RecentlyViewedSectionState extends State<_RecentlyViewedSection> {
+  final _firestoreService = FirebaseFirestoreService();
+  List<ProductModel> _recentProducts = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+  }
+
+  Future<void> _loadRecent() async {
+    final ids = await _firestoreService.getRecentlyViewed();
+    if (ids.isEmpty) {
+      setState(() => _loaded = true);
+      return;
+    }
+    final products = <ProductModel>[];
+    for (final id in ids) {
+      final p = widget.pc.getProductById(id);
+      if (p != null) products.add(p);
+    }
+    if (mounted)
+      setState(() {
+        _recentProducts = products;
+        _loaded = true;
+      });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _recentProducts.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.history, size: 16, color: AppTheme.primaryColor),
+              const SizedBox(width: 6),
+              const Text(
+                'Recently Viewed',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 270,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: _recentProducts.length,
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: SizedBox(
+                width: 170,
+                child: ProductCard(
+                  product: _recentProducts[i],
+                  onTap: () => Get.toNamed(
+                    AppRoutes.productDetail,
+                    arguments: _recentProducts[i],
+                  ),
+                  onAddToCart: () => widget.cc.addToCart(_recentProducts[i]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
