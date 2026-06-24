@@ -9,6 +9,7 @@ class FirebaseFirestoreService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String get _uid => _auth.currentUser?.uid ?? '';
+  String get currentUserId => _uid;
 
   // ═══════════════════════════════════════════
   // PRODUCTS
@@ -523,6 +524,11 @@ class FirebaseFirestoreService {
   Future<void> cancelOrder(String orderId) async {
     if (_uid.isEmpty) return;
     await _ordersRef.doc(orderId).update({'status': 'Cancelled'});
+  }
+
+  Future<void> deleteOrder(String orderId) async {
+    if (_uid.isEmpty) return;
+    await _ordersRef.doc(orderId).delete();
   }
 
   // ═══════════════════════════════════════════

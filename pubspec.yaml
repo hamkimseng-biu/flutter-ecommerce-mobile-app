@@ -85,6 +85,7 @@ flutter:
     - assets/images/placeholder.png
     - assets/images/google_logo.png
     - assets/images/icon.png
+    - assets/logo/icons8-google-logo-96.png
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package

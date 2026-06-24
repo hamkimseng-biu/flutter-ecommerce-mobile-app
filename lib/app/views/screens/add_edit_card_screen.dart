@@ -136,6 +136,17 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
       AppSnack.error('Invalid Expiry', 'Enter a valid future MM/YY.');
       return;
     }
+
+    // Check authentication
+    final uid = FirebaseFirestoreService().currentUserId;
+    if (uid.isEmpty) {
+      AppSnack.error(
+        'Login Required',
+        'Please log in to save payment methods.',
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     final card = {
       'number': clean,
@@ -149,7 +160,7 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
       if (_isEdit &&
           _existingId != null &&
           _existingId!.isNotEmpty &&
-          !_existingId!.startsWith('mock')) {
+          !_existingId!.contains('mock')) {
         await service.saveCard(card, docId: _existingId!);
       } else {
         await service.saveCard(card);
@@ -165,7 +176,10 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        AppSnack.error('Error', 'Could not save card. Try again.');
+        AppSnack.error(
+          'Error',
+          'Could not save: ${e.toString().replaceFirst("Exception: ", "")}',
+        );
       }
     }
   }
@@ -405,6 +419,7 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
                 ),
               ],
             ),
+
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

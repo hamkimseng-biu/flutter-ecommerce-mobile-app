@@ -251,9 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 22,
                         height: 22,
                         child: Image.asset(
-                          'assets/images/google_logo.png',
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.g_mobiledata, size: 28),
+                          'assets/logo/icons8-google-logo-96.png',
                         ),
                       ),
                       label: const Text(

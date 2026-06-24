@@ -104,27 +104,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     final fillColor = isDark ? AppTheme.darkInputFill : AppTheme.lightInputFill;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Address' : 'New Address'),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primaryColor,
-                    ),
-                  )
-                : const Text(
-                    'Save',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Address' : 'New Address')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(

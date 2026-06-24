@@ -75,6 +75,16 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
       AppSnack.error('Required', 'Please fill all required fields.');
       return;
     }
+
+    final uid = FirebaseFirestoreService().currentUserId;
+    if (uid.isEmpty) {
+      AppSnack.error(
+        'Login Required',
+        'Please log in to save payment methods.',
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     final bank = {
       'bankName': _bankCtrl.text.trim(),
@@ -89,7 +99,7 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
       if (_isEdit &&
           _existingId != null &&
           _existingId!.isNotEmpty &&
-          !_existingId!.startsWith('mock')) {
+          !_existingId!.contains('mock')) {
         await service.saveBankAccount(bank, docId: _existingId!);
       } else {
         await service.saveBankAccount(bank);
@@ -105,7 +115,10 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        AppSnack.error('Error', 'Could not save bank account. Try again.');
+        AppSnack.error(
+          'Error',
+          'Could not save: ${e.toString().replaceFirst("Exception: ", "")}',
+        );
       }
     }
   }
@@ -312,7 +325,6 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
               ],
             ),
             const SizedBox(height: 32),
-
             SizedBox(
               width: double.infinity,
               height: 54,

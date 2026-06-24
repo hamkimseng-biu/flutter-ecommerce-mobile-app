@@ -20,7 +20,14 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
   int _activeTab = 0;
-  final _tabs = ['All', 'Processing', 'Shipping', 'Delivered', 'To Review'];
+  final _tabs = [
+    'All',
+    'Processing',
+    'Shipping',
+    'Delivered',
+    'Cancelled',
+    'To Review',
+  ];
 
   final List<Map<String, dynamic>> _mockOrders = [
     {
@@ -100,7 +107,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   List<Map<String, dynamic>> _filterList(List<Map<String, dynamic>> list) {
     if (_activeTab == 0) return list;
-    if (_activeTab == 4)
+    if (_activeTab == 5)
       return list.where((o) => o['status'] == 'Delivered').toList();
     final status = _tabs[_activeTab];
     return list.where((o) => o['status'] == status).toList();
@@ -114,6 +121,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         return AppTheme.primaryColor;
       case 'Processing':
         return Colors.amber;
+      case 'Cancelled':
+        return AppTheme.errorColor;
       default:
         return Colors.grey;
     }
@@ -127,6 +136,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         return Icons.local_shipping;
       case 'Processing':
         return Icons.hourglass_top;
+      case 'Cancelled':
+        return Icons.cancel;
       default:
         return Icons.schedule;
     }
@@ -167,46 +178,63 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(title: const Text('My Orders')),
       body: Column(
         children: [
-          // Filter tabs
+          // Twitter-style tab bar
           Container(
-            height: 50,
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
-              borderRadius: BorderRadius.circular(14),
+              color: Theme.of(context).scaffoldBackgroundColor,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  width: 0.5,
+                ),
+              ),
             ),
-            child: Row(
-              children: List.generate(_tabs.length, (i) {
-                final active = _activeTab == i;
-                return Expanded(
-                  child: GestureDetector(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(_tabs.length, (i) {
+                  final active = _activeTab == i;
+                  return GestureDetector(
                     onTap: () => setState(() => _activeTab = i),
-                    child: Container(
-                      margin: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? AppTheme.primaryColor
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _tabs[i],
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: active
-                                ? Colors.white
-                                : (isDark
-                                      ? Colors.white54
-                                      : Colors.grey.shade600),
+                    behavior: HitTestBehavior.opaque,
+                    child: SizedBox(
+                      width: (_tabs[i].length * 10.0 + 32),
+                      height: 44,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          const Spacer(),
+                          Text(
+                            _tabs[i],
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: active
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: active
+                                  ? AppTheme.primaryColor
+                                  : Colors.grey.shade500,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            height: active ? 3 : 0,
+                            width: active ? 32 : 0,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                );
-              }),
+                  );
+                }),
+              ),
             ),
           ),
           // Order list — real-time stream
@@ -257,7 +285,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     final items = o['items'] as List;
                     final status = o['status'] as String;
                     final color = _statusColor(status);
-                    return _buildOrderCard(
+                    final card = _buildOrderCard(
                       cardBg,
                       isDark,
                       o,
@@ -265,6 +293,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       status,
                       color,
                     );
+                    // Allow swipe-to-delete for cancelled orders
+                    if (status == 'Cancelled') {
+                      return Dismissible(
+                        key: Key(o['firestoreId'] ?? o['id'] as String),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (_) async {
+                          await _deleteOrder(o);
+                          return true;
+                        },
+                        background: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 24),
+                          decoration: BoxDecoration(
+                            color: AppTheme.errorColor,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        child: card,
+                      );
+                    }
+                    return card;
                   },
                 );
               },
@@ -311,6 +366,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  Future<void> _deleteOrder(Map<String, dynamic> o) async {
+    final fid = o['firestoreId'] as String?;
+    if (fid == null) return;
+    try {
+      await _firestoreService.deleteOrder(fid);
+      AppSnack.info('Deleted', 'Order removed.');
+    } catch (_) {
+      AppSnack.error('Error', 'Could not delete order.');
+    }
+  }
+
   Widget _buildEmptyState(String tab) {
     String icon;
     String title;
@@ -336,6 +402,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
         title = 'No delivered orders';
         subtitle = 'Completed orders will show up here.';
         break;
+      case 'Cancelled':
+        icon = '🗑️';
+        title = 'No cancelled orders';
+        subtitle = 'Cancelled orders will appear here.';
+        break;
       default:
         icon = '🛍️';
         title = 'No orders yet';
@@ -359,12 +430,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => Get.offAllNamed(AppRoutes.main),
-            icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-            label: const Text('Start Shopping'),
+            icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+            label: const Text('Start Shopping', style: TextStyle(fontSize: 13)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ],
