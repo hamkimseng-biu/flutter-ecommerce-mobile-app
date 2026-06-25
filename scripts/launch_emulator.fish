@@ -43,3 +43,13 @@ end
 
 # Direct cold-boot command:
 # QT_QPA_PLATFORM=xcb prime-run emulator -avd Pixel_9 -no-snapshot &
+# QT_QPA_PLATFORM=xcb prime-run emulator --launch Pixel_9 
+
+# Kill by ADB port (most reliable)
+adb -s emulator-5554 emu kill
+
+# Or kill ALL emulators
+adb devices | grep emulator | cut -f1 | xargs -I{} adb -s {} emu kill
+
+# Or nuke the emulator process directly # 09919399 # 193993
+pkill -f emulator

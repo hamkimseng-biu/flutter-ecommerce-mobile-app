@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 
@@ -31,14 +32,25 @@ class CurrencyController extends GetxController {
     }
   }
 
+  StreamSubscription? _sub;
+
   @override
   void onInit() {
     super.onInit();
     _listenCurrency();
   }
 
+  @override
+  void onClose() {
+    _sub?.cancel();
+    super.onClose();
+  }
+
   void _listenCurrency() {
-    _firestore.collection('settings').doc('app').snapshots().listen((doc) {
+    _sub?.cancel();
+    _sub = _firestore.collection('settings').doc('app').snapshots().listen((
+      doc,
+    ) {
       if (doc.exists) {
         final data = doc.data()!;
         final raw = data['currency'] as String? ?? 'USD (\$)';
@@ -50,6 +62,21 @@ class CurrencyController extends GetxController {
             ? 'EUR'
             : 'USD';
         if (currency.value != code) currency.value = code;
+      }
+    });
+    // Initial one-shot fetch to ensure latest value on startup
+    _firestore.collection('settings').doc('app').get().then((doc) {
+      if (doc.exists) {
+        final data = doc.data()!;
+        final raw = data['currency'] as String? ?? 'USD (\$)';
+        final code = raw.contains('USD')
+            ? 'USD'
+            : raw.contains('KHR')
+            ? 'KHR'
+            : raw.contains('EUR')
+            ? 'EUR'
+            : 'USD';
+        currency.value = code;
       }
     });
   }

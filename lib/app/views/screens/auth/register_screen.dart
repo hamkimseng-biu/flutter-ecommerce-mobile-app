@@ -3,13 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../../../config/app_theme.dart';
 import '../../../../../config/app_snack.dart';
-import '../../../config/kh_phone_util.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../routes/app_routes.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
-
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
@@ -20,11 +18,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _emailFocus = FocusNode();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-
-  // Auto-detected mode: false = email, true = phone
   bool _isPhone = false;
+  bool _sendingCode = false;
 
   @override
   void initState() {
@@ -39,140 +37,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailOrPhoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _emailFocus.dispose();
     super.dispose();
   }
 
-  void _onInputChanged() {
+  // Check directly — never stale
+  bool _isPhoneInput() {
     final raw = _emailOrPhoneController.text;
+    return !raw.contains('@') &&
+        raw.replaceAll(RegExp(r'[^\d]'), '').isNotEmpty;
+  }
 
-    // Auto-detect: if contains @ → email, otherwise check if looks like phone
-    final looksLikePhone =
-        !raw.contains('@') && raw.replaceAll(RegExp(r'[^\d]'), '').length >= 1;
-    if (_isPhone != looksLikePhone) {
-      setState(() => _isPhone = looksLikePhone);
+  void _onInputChanged() {
+    if (!_isPhoneInput()) {
+      if (_isPhone) setState(() => _isPhone = false);
+      return;
     }
-
-    // Live phone formatting: add spaces as user types
-    if (_isPhone) {
-      final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
-      final formatted = _formatPhone(digits);
-      if (raw != formatted) {
-        final sel = _emailOrPhoneController.selection.baseOffset;
-        final diff = formatted.length - raw.length;
-        _emailOrPhoneController.value = TextEditingValue(
-          text: formatted,
-          selection: TextSelection.collapsed(
-            offset: (sel + diff).clamp(0, formatted.length),
-          ),
-        );
-      }
+    if (!_isPhone) setState(() => _isPhone = true);
+    final digits = _emailOrPhoneController.text.replaceAll(
+      RegExp(r'[^\d]'),
+      '',
+    );
+    final formatted = _formatPhone(digits);
+    if (_emailOrPhoneController.text != formatted) {
+      final sel = _emailOrPhoneController.selection.baseOffset;
+      final diff = formatted.length - _emailOrPhoneController.text.length;
+      _emailOrPhoneController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(
+          offset: (sel + diff).clamp(0, formatted.length),
+        ),
+      );
     }
   }
 
   String _formatPhone(String digits) {
-    if (digits.isEmpty) return '';
     if (digits.length <= 3) return digits;
-    if (digits.length <= 6) {
+    if (digits.length <= 6)
       return '${digits.substring(0, 3)} ${digits.substring(3)}';
-    }
-    return '${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6, digits.length > 10 ? 10 : digits.length)}';
+    return '${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6)}';
   }
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-
     final auth = Get.find<AuthController>();
-    String? error;
+    final raw = _emailOrPhoneController.text.replaceAll(RegExp(r'[^\d]'), '');
 
-    if (_isPhone) {
-      final phone = KhPhoneUtil.toE164(_emailOrPhoneController.text);
-      error = await auth.sendPhoneOTP(phone);
-      if (error != null) {
-        if (mounted) AppSnack.error('Error', error);
-        return;
-      }
-      if (auth.isLoggedIn.value) return;
-      _showOTPDialog();
+    // Pure digits 8+ = phone OTP flow
+    if (raw.length >= 8) {
+      final phone = '+855${raw.startsWith('0') ? raw.substring(1) : raw}';
+      // Navigate to SMS screen first, then send OTP
+      Get.toNamed(
+        AppRoutes.phoneOTP,
+        arguments: {'phoneNumber': phone, 'isRegistration': true},
+      );
+      // Send OTP in background
+      setState(() => _sendingCode = true);
+      final error = await auth.sendPhoneOTP(phone);
+      if (mounted) setState(() => _sendingCode = false);
+      if (error != null && mounted) AppSnack.error('Error', error);
     } else {
-      error = await auth.signUp(
+      final error = await auth.signUp(
         _nameController.text.trim(),
         _emailOrPhoneController.text.trim(),
         _passwordController.text,
       );
-      if (error != null && mounted) {
+      if (error != null && mounted)
         AppSnack.error('Registration Failed', error);
-      }
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
     final auth = Get.find<AuthController>();
     final error = await auth.signInWithGoogle();
-    if (error != null && mounted) {
+    if (error != null && mounted)
       AppSnack.error('Google Sign-In Failed', error);
-    }
   }
 
-  void _showOTPDialog() {
-    final otpCtrl = TextEditingController();
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Verify Code',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter the 6-digit code sent to your phone.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF9E9EAA)),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, letterSpacing: 8),
-              decoration: InputDecoration(
-                hintText: '000000',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                counterText: '',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () async {
-              final code = otpCtrl.text.trim();
-              if (code.length != 6) {
-                AppSnack.error('Invalid', 'Enter the 6-digit code.');
-                return;
-              }
-              Get.back();
-              final auth = Get.find<AuthController>();
-              final error = await auth.verifyPhoneOTP(code);
-              if (error != null) AppSnack.error('Error', error);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            child: const Text('Verify'),
-          ),
-        ],
-      ),
-    );
+  void _focusPhoneField() {
+    _emailOrPhoneController.clear();
+    _emailFocus.requestFocus();
+    setState(() => _isPhone = true);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = Get.find<AuthController>();
 
     return Scaffold(
       body: SafeArea(
@@ -183,42 +134,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-
-                // Logo & App Name
+                const SizedBox(height: 36),
                 Center(
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset(
-                          'assets/images/icon.png',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Tiny Chicken',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Create your account',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.person_add_outlined,
+                      size: 36,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 20),
+                const Center(
+                  child: Text(
+                    'Create Account',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'Sign up to get started.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 32),
 
-                const SizedBox(height: 40),
-
-                // Name Field
                 TextFormField(
                   controller: _nameController,
                   textInputAction: TextInputAction.next,
-                  textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
                     labelText: 'Full Name',
                     hintText: 'John Doe',
@@ -231,46 +181,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ? AppTheme.darkInputFill
                         : AppTheme.lightInputFill,
                   ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty)
-                      return 'Please enter your name';
-                    if (v.trim().length < 2)
-                      return 'Name must be at least 2 characters';
-                    return null;
-                  },
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Please enter your name'
+                      : null,
                 ),
-
                 const SizedBox(height: 16),
 
-                // Unified Email/Phone field — auto-detects type dynamically
                 TextFormField(
                   controller: _emailOrPhoneController,
-                  keyboardType: _isPhone
-                      ? TextInputType.phone
-                      : TextInputType.emailAddress,
+                  focusNode: _emailFocus,
+                  keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  inputFormatters: _isPhone
-                      ? [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(15),
-                        ]
-                      : null,
                   decoration: InputDecoration(
                     labelText: _isPhone ? 'Phone Number' : 'Email or Phone',
-                    hintText: _isPhone ? '12 345 678' : 'you@example.com',
+                    hintText: _isPhone ? '012 345 678' : 'you@example.com',
                     prefixIcon: Icon(
                       _isPhone ? Icons.phone_android : Icons.email_outlined,
                     ),
-                    suffixIcon: _isPhone
-                        ? null
-                        : const Padding(
-                            padding: EdgeInsets.only(right: 12),
-                            child: Icon(
-                              Icons.phone_android,
-                              size: 18,
-                              color: Color(0xFF9E9EAA),
-                            ),
-                          ),
+                    prefixText: _isPhone ? '+855 ' : null,
+                    prefixStyle: const TextStyle(fontWeight: FontWeight.w600),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -280,30 +209,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : AppTheme.lightInputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return _isPhone
-                          ? 'Please enter your phone number'
-                          : 'Please enter your email or phone';
-                    }
-                    if (_isPhone) {
-                      if (v.replaceAll(RegExp(r'[^\d]'), '').length < 8) {
-                        return 'Enter a valid phone number';
-                      }
-                    } else {
-                      final hasAt = v.contains('@');
-                      final hasDigits =
-                          v.replaceAll(RegExp(r'[^\d]'), '').length >= 8;
-                      if (!hasAt && !hasDigits) {
-                        return 'Enter a valid email or phone number';
-                      }
-                    }
+                    if (v == null || v.trim().isEmpty)
+                      return 'Enter email or phone number';
+                    final d = v.replaceAll(RegExp(r'[^\d]'), '');
+                    final isPhone = !v.contains('@') && d.isNotEmpty;
+                    if (isPhone && d.length < 8) return 'Phone too short';
+                    if (!isPhone && !GetUtils.isEmail(v.trim()) && d.length < 8)
+                      return 'Enter a valid email or phone';
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 16),
 
-                // Password Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -317,9 +234,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -330,19 +246,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : AppTheme.lightInputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) {
+                    if (v == null || v.isEmpty)
                       return 'Please enter a password';
-                    }
-                    if (v.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
+                    if (v.length < 6) return 'At least 6 characters';
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 16),
 
-                // Confirm Password Field
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirm,
@@ -357,9 +268,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
-                      onPressed: () {
-                        setState(() => _obscureConfirm = !_obscureConfirm);
-                      },
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -370,55 +280,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : AppTheme.lightInputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Please confirm your password';
-                    }
-                    if (v != _passwordController.text) {
+                    if (v == null || v.isEmpty) return 'Please confirm';
+                    if (v != _passwordController.text)
                       return 'Passwords do not match';
-                    }
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 24),
 
-                // Register Button
-                GetBuilder<AuthController>(
-                  builder: (auth) => SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: auth.isLoading.value ? null : _handleRegister,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: (auth.isLoading.value || _sendingCode)
+                        ? null
+                        : _handleRegister,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: auth.isLoading.value
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _isPhone
-                                  ? 'Send Verification Code'
-                                  : 'Create Account',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                     ),
+                    child: (auth.isLoading.value || _sendingCode)
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
 
                 const SizedBox(height: 20),
-
-                // Divider
                 Row(
                   children: [
                     const Expanded(child: Divider()),
@@ -426,55 +327,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'or continue with',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ),
                     const Expanded(child: Divider()),
                   ],
                 ),
-
                 const SizedBox(height: 20),
 
-                // Google Sign In Button
-                GetBuilder<AuthController>(
-                  builder: (auth) => SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: auth.isLoading.value
-                          ? null
-                          : _handleGoogleSignIn,
-                      icon: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Image.asset(
-                          'assets/logo/icons8-google-logo-96.png',
-                        ),
-                      ),
-                      label: const Text(
-                        'Sign in with Google',
-                        style: TextStyle(fontSize: 15),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.white24 : Colors.black12,
-                        ),
-                      ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _socialIcon(
+                      onTap: auth.isLoading.value ? null : _handleGoogleSignIn,
+                      asset: 'assets/logo/icons8-google-logo-96.png',
+                      isDark: isDark,
                     ),
-                  ),
+                    const SizedBox(width: 20),
+                    _socialIcon(
+                      onTap: auth.isLoading.value ? null : _focusPhoneField,
+                      icon: Icons.phone_android,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 20),
+                    _socialIcon(
+                      onTap: () {},
+                      asset: 'assets/logo/Facebook-Logosu-500x281.png',
+                      isDark: isDark,
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 24),
-
-                // Login Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       'Already have an account? ',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: TextStyle(color: Colors.grey),
                     ),
                     GestureDetector(
                       onTap: () => Get.offAllNamed(AppRoutes.login),
@@ -489,31 +379,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-
-                // Explore as Guest
-                Center(
-                  child: TextButton(
-                    onPressed: () => Get.offAllNamed(AppRoutes.main),
-                    child: Text(
-                      'Explore as Guest',
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                        decorationColor: isDark
-                            ? Colors.white54
-                            : Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _socialIcon({
+    VoidCallback? onTap,
+    String? asset,
+    IconData? icon,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+        ),
+        child: Center(
+          child: asset != null
+              ? Image.asset(asset, width: 36, height: 36, fit: BoxFit.contain)
+              : Icon(icon, size: 26, color: Colors.grey.shade700),
         ),
       ),
     );

@@ -1,196 +1,121 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../../../config/app_theme.dart';
-import '../../../../../config/app_constants.dart';
 import '../../../../../config/app_snack.dart';
-import '../../../config/kh_phone_util.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../routes/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
-
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
+  final _emailOrPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
+  bool _isPhone = false;
+  bool _sendingCode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailOrPhoneController.addListener(_onInputChanged);
+  }
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _emailOrPhoneController.removeListener(_onInputChanged);
+    _emailOrPhoneController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
+  }
+
+  void _onInputChanged() {
+    final raw = _emailOrPhoneController.text;
+    final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+    // Phone if: no @ and 3+ digits (most reliable)
+    final looksLikePhone = !raw.contains('@') && digits.length >= 3;
+    if (_isPhone != looksLikePhone) setState(() => _isPhone = looksLikePhone);
+    // Live phone formatting with spaces
+    if (looksLikePhone) {
+      final formatted = _formatPhone(digits);
+      if (formatted != raw) {
+        final sel = _emailOrPhoneController.selection.baseOffset;
+        final diff = formatted.length - raw.length;
+        _emailOrPhoneController.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(
+            offset: (sel + diff).clamp(0, formatted.length),
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatPhone(String digits) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6)
+      return digits.substring(0, 3) + ' ' + digits.substring(3);
+    return digits.substring(0, 3) +
+        ' ' +
+        digits.substring(3, 6) +
+        ' ' +
+        digits.substring(6);
   }
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
     final auth = Get.find<AuthController>();
-    final error = await auth.signIn(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+    final raw = _emailOrPhoneController.text.replaceAll(RegExp(r'[^\d]'), '');
 
-    if (error != null && mounted) {
-      AppSnack.error('Login Failed', error);
+    // Pure digits 8+ = phone OTP
+    if (raw.length >= 8) {
+      final phone = '+855${raw.startsWith('0') ? raw.substring(1) : raw}';
+      // Navigate to SMS screen first, then send OTP
+      Get.toNamed(
+        AppRoutes.phoneOTP,
+        arguments: {'phoneNumber': phone, 'isRegistration': false},
+      );
+      setState(() => _sendingCode = true);
+      final error = await auth.sendPhoneOTP(phone);
+      if (mounted) setState(() => _sendingCode = false);
+      if (error != null && mounted) AppSnack.error('Error', error);
+    } else {
+      final error = await auth.signIn(
+        _emailOrPhoneController.text.trim(),
+        _passwordController.text,
+      );
+      if (error != null && mounted) AppSnack.error('Login Failed', error);
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
     final auth = Get.find<AuthController>();
     final error = await auth.signInWithGoogle();
-
-    if (error != null && mounted) {
+    if (error != null && mounted)
       AppSnack.error('Google Sign-In Failed', error);
-    }
   }
 
-  void _handleForgotPassword() {
-    Get.toNamed(AppRoutes.forgotPassword);
-  }
+  void _handleForgotPassword() => Get.toNamed(AppRoutes.forgotPassword);
 
-  void _handlePhoneSignIn(BuildContext context) {
-    final phoneCtrl = TextEditingController();
-    Get.dialog(
-      StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Phone Sign In',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter your phone number to receive a verification code.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF9E9EAA)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: '012 345 678',
-                  prefixIcon: const Icon(Icons.phone_android),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final digits = phoneCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
-                if (digits.length < 8) {
-                  AppSnack.error('Invalid', 'Enter a valid phone number.');
-                  return;
-                }
-                Get.back();
-                final e164 = KhPhoneUtil.toE164(digits);
-                final auth = Get.find<AuthController>();
-                final error = await auth.sendPhoneOTP(e164);
-                if (error != null) {
-                  AppSnack.error('Error', error);
-                  return;
-                }
-                if (auth.isLoggedIn.value) return;
-                _showOTPDialog(context);
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
-              child: const Text('Send Code'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showOTPDialog(BuildContext context) {
-    final otpCtrl = TextEditingController();
-    Get.dialog(
-      StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Verify Code',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter the 6-digit code sent to your phone.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF9E9EAA)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: otpCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                decoration: InputDecoration(
-                  hintText: '000000',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  counterText: '',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Get.back(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final code = otpCtrl.text.trim();
-                if (code.length != 6) {
-                  AppSnack.error('Invalid', 'Enter the 6-digit code.');
-                  return;
-                }
-                Get.back();
-                final auth = Get.find<AuthController>();
-                final error = await auth.verifyPhoneOTP(code);
-                if (error != null) {
-                  AppSnack.error('Error', error);
-                }
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
-              child: const Text('Verify'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _focusPhoneField() {
+    _emailOrPhoneController.clear();
+    _emailFocus.requestFocus();
+    setState(() => _isPhone = true);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = Get.find<AuthController>();
 
     return Scaffold(
       body: SafeArea(
@@ -201,46 +126,58 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
-
-                // Logo & App Name
+                const SizedBox(height: 48),
                 Center(
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset(
-                          'assets/images/icon.png',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        AppConstants.appName,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppConstants.appTagline,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 36,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 20),
+                const Center(
+                  child: Text(
+                    'Welcome Back!',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'Sign in to continue.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 36),
 
-                const SizedBox(height: 40),
-
-                // Email Field
+                // Email or Phone field — always visible
                 TextFormField(
-                  controller: _emailController,
+                  controller: _emailOrPhoneController,
+                  focusNode: _emailFocus,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
+                  maxLength: _isPhone ? 12 : null,
+                  inputFormatters: _isPhone
+                      ? [LengthLimitingTextInputFormatter(12)]
+                      : null,
+                  onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                   decoration: InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'you@example.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    labelText: _isPhone ? 'Phone Number' : 'Email or Phone',
+                    hintText: _isPhone ? '012 345 678' : 'you@example.com',
+                    prefixIcon: Icon(
+                      _isPhone ? Icons.phone_android : Icons.email_outlined,
+                    ),
+                    prefixText: _isPhone ? '+855 ' : null,
+                    prefixStyle: const TextStyle(fontWeight: FontWeight.w600),
+                    counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -250,21 +187,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         : AppTheme.lightInputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!GetUtils.isEmail(v.trim())) {
-                      return 'Please enter a valid email';
-                    }
+                    if (v == null || v.trim().isEmpty)
+                      return 'Enter email or phone number';
+                    if (_isPhone &&
+                        v.replaceAll(RegExp(r'[^\d]'), '').length < 8)
+                      return 'Phone number too short';
+                    if (!_isPhone &&
+                        !GetUtils.isEmail(v.trim()) &&
+                        v.replaceAll(RegExp(r'[^\d]'), '').length < 8)
+                      return 'Enter a valid email or phone';
                     return null;
                   },
                 ),
 
                 const SizedBox(height: 16),
 
-                // Password Field
+                // Password — always visible
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocus,
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleLogin(),
@@ -277,9 +218,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -290,12 +230,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         : AppTheme.lightInputFill,
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) {
+                    if (v == null || v.isEmpty)
                       return 'Please enter your password';
-                    }
-                    if (v.length < 6) {
+                    if (v.length < 6)
                       return 'Password must be at least 6 characters';
-                    }
                     return null;
                   },
                 ),
@@ -314,35 +252,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 8),
 
-                // Login Button
-                GetBuilder<AuthController>(
-                  builder: (auth) => SizedBox(
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: auth.isLoading.value ? null : _handleLogin,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                // Sign In button — always says Sign In
+                SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: (auth.isLoading.value || _sendingCode)
+                        ? null
+                        : _handleLogin,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: auth.isLoading.value
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Sign In',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                     ),
+                    child: (auth.isLoading.value || _sendingCode)
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
 
@@ -356,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'or continue with',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ),
                     const Expanded(child: Divider()),
@@ -365,73 +303,39 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // Google Sign In Button
-                GetBuilder<AuthController>(
-                  builder: (auth) => SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: auth.isLoading.value
-                          ? null
-                          : _handleGoogleSignIn,
-                      icon: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Image.asset(
-                          'assets/logo/icons8-google-logo-96.png',
-                        ),
-                      ),
-                      label: const Text(
-                        'Sign in with Google',
-                        style: TextStyle(fontSize: 15),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.white24 : Colors.black12,
-                        ),
-                      ),
+                // Social icon buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _socialIcon(
+                      onTap: auth.isLoading.value ? null : _handleGoogleSignIn,
+                      asset: 'assets/logo/icons8-google-logo-96.png',
+                      isDark: isDark,
                     ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Phone Sign In Button
-                GetBuilder<AuthController>(
-                  builder: (auth) => SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: auth.isLoading.value
-                          ? null
-                          : () => _handlePhoneSignIn(context),
-                      icon: const Icon(Icons.phone_android, size: 22),
-                      label: const Text(
-                        'Sign in with Phone',
-                        style: TextStyle(fontSize: 15),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.white24 : Colors.black12,
-                        ),
-                      ),
+                    const SizedBox(width: 20),
+                    _socialIcon(
+                      onTap: auth.isLoading.value ? null : _focusPhoneField,
+                      icon: Icons.phone_android,
+                      isDark: isDark,
                     ),
-                  ),
+                    const SizedBox(width: 20),
+                    _socialIcon(
+                      onTap: () {},
+                      asset: 'assets/logo/Facebook-Logosu-500x281.png',
+                      isDark: isDark,
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 24),
 
-                // Register Link
+                // Register link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       "Don't have an account? ",
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: TextStyle(color: Colors.grey),
                     ),
                     GestureDetector(
                       onTap: () => Get.offAllNamed(AppRoutes.register),
@@ -449,28 +353,49 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 16),
 
-                // Explore as Guest
+                // Guest
                 Center(
                   child: TextButton(
                     onPressed: () => Get.offAllNamed(AppRoutes.main),
-                    child: Text(
+                    child: const Text(
                       'Explore as Guest',
                       style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey.shade600,
+                        color: Colors.grey,
                         fontSize: 14,
                         decoration: TextDecoration.underline,
-                        decorationColor: isDark
-                            ? Colors.white54
-                            : Colors.grey.shade600,
                       ),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _socialIcon({
+    VoidCallback? onTap,
+    String? asset,
+    IconData? icon,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+        ),
+        child: Center(
+          child: asset != null
+              ? Image.asset(asset, width: 36, height: 36, fit: BoxFit.contain)
+              : Icon(icon, size: 26, color: Colors.grey.shade700),
         ),
       ),
     );

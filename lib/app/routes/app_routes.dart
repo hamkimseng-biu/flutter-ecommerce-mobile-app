@@ -3,6 +3,7 @@ import '../views/screens/auth/splash_screen.dart';
 import '../views/screens/home/main_screen.dart';
 import '../views/screens/auth/login_screen.dart';
 import '../views/screens/auth/register_screen.dart';
+import '../views/screens/auth/phone_otp_screen.dart';
 import '../views/screens/profile/edit_profile_screen.dart';
 import '../views/screens/order/order_detail_screen.dart';
 import '../views/screens/admin/admin_products_screen.dart';
@@ -63,6 +64,8 @@ class AppRoutes {
   static const String flashSales = '/flash-sales';
   static const String popularShops = '/popular-shops';
 
+  static const String phoneOTP = '/phone-otp';
+
   static List<GetPage> pages = [
     GetPage(
       name: splash,
@@ -83,6 +86,17 @@ class AppRoutes {
       name: register,
       page: () => const RegisterScreen(),
       transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: phoneOTP,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>;
+        return PhoneOTPScreen(
+          phoneNumber: args['phoneNumber'] as String,
+          isRegistration: args['isRegistration'] as bool? ?? false,
+        );
+      },
+      transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
       name: main,

@@ -70,8 +70,16 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
       await _authService.signInWithEmail(email, password);
+      // Brief loading before transition
+      if (Get.isDialogOpen ?? false) Get.back();
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (Get.isDialogOpen ?? false) Get.back();
       Get.offAllNamed('/main');
-      return null; // success
+      return null;
     } catch (e) {
       return e.toString();
     } finally {
@@ -88,8 +96,15 @@ class AuthController extends GetxController {
         isLoading.value = false;
         return null; // User cancelled, not an error
       }
+      if (Get.isDialogOpen ?? false) Get.back();
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (Get.isDialogOpen ?? false) Get.back();
       Get.offAllNamed('/main');
-      return null; // success
+      return null;
     } catch (e) {
       return e.toString();
     } finally {
@@ -101,16 +116,13 @@ class AuthController extends GetxController {
   PhoneAuthResult? _phoneConfirmation;
 
   /// Sends OTP to [phoneNumber] (E.164 format: +85512345678).
-  /// Returns null on success (code sent or auto-verified), or an error message.
+  /// Returns null on success, or an error message.
   Future<String?> sendPhoneOTP(String phoneNumber) async {
     try {
       isLoading.value = true;
       _phoneConfirmation = await _authService.verifyPhoneNumber(phoneNumber);
-      // If verificationId is empty, auto-verification happened — user already signed in
-      if (_phoneConfirmation!.verificationId.isEmpty) {
-        _phoneConfirmation = null;
-        Get.offAllNamed('/main');
-      }
+      // For test numbers, auto-verification happens — we let the OTP screen
+      // handle it rather than auto-navigating away.
       return null;
     } catch (e) {
       return e.toString();
@@ -122,6 +134,12 @@ class AuthController extends GetxController {
   /// Verifies the OTP [smsCode] and completes phone sign-in.
   /// Returns null on success, or an error message.
   Future<String?> verifyPhoneOTP(String smsCode) async {
+    // If auto-verified (test numbers), user is already signed in
+    if (isLoggedIn.value) {
+      _phoneConfirmation = null;
+      Get.offAllNamed('/main');
+      return null;
+    }
     if (_phoneConfirmation == null) {
       return 'No verification in progress. Please try again.';
     }
@@ -153,7 +171,17 @@ class AuthController extends GetxController {
 
   // Sign out
   Future<void> logout() async {
+    if (Get.isDialogOpen ?? false) return;
+    Get.dialog(
+      const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      barrierDismissible: false,
+    );
+    await Future.delayed(const Duration(milliseconds: 300));
     await _authService.signOut();
+    if (Get.isDialogOpen ?? false) Get.back();
   }
 
   /// Returns true if user is signed in. If not, shows a prompt to sign in.

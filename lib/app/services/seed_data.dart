@@ -187,6 +187,7 @@ class SeedDataService {
       if (existing.docs.isEmpty) {
         await _firestore.collection('categories').add({
           ...c,
+          'order': (cats.indexOf(c) * 10),
           'createdAt': FieldValue.serverTimestamp(),
         });
       }

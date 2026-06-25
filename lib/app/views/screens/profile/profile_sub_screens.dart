@@ -2263,12 +2263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subColor,
           ),
           _tile('Cache Size', '24.5 MB', () {}, subColor),
-          _tile(
-            'App Version',
-            '1.0.0',
-            () => Get.toNamed(AppRoutes.adminProducts),
-            subColor,
-          ),
+          _adminAccessTile('App Version', '1.0.0', subColor),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -2291,6 +2286,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Triple-tap to access admin panel
+  int _adminTapCount = 0;
+  DateTime _lastAdminTap = DateTime.now();
+
+  Widget _adminAccessTile(String title, String value, Color sub) {
+    return InkWell(
+      onTap: () {
+        final now = DateTime.now();
+        if (now.difference(_lastAdminTap).inMilliseconds > 800) {
+          _adminTapCount = 0;
+        }
+        _lastAdminTap = now;
+        _adminTapCount++;
+        if (_adminTapCount >= 3) {
+          _adminTapCount = 0;
+          Get.toNamed(AppRoutes.adminProducts);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 15)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(value, style: TextStyle(fontSize: 14, color: sub)),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: Color(0xFF9E9EAA),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -120,7 +120,7 @@ class FirebaseFirestoreService {
 
   Stream<List<Map<String, dynamic>>> getCategoriesStream() {
     return _categoriesRef.orderBy('order').snapshots().map((snap) {
-      return snap.docs.map((doc) {
+      var list = snap.docs.map((doc) {
         final d = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
@@ -130,6 +130,8 @@ class FirebaseFirestoreService {
           'createdAt': d['createdAt'],
         };
       }).toList();
+      list.sort((a, b) => (a['order'] as int).compareTo(b['order'] as int));
+      return list;
     });
   }
 
