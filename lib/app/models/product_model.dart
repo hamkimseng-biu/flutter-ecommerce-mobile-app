@@ -7,6 +7,7 @@ class ProductModel {
   final double price;
   final double originalPrice;
   final List<String> images;
+  final List<String> detailImages;
   final String category;
   final double rating;
   final int reviewCount;
@@ -22,6 +23,14 @@ class ProductModel {
   final double flashSalePrice;
   final DateTime? saleEndsAt;
   final bool isFeatured;
+  // Admin-editable discount percent (0-100).  System auto-calculates prices.
+  final double discountPercent;
+  // Toggle badge visibility
+  final bool showSoldCount;
+  final bool showRating;
+  final bool showReviewCount;
+  // Free shipping
+  final bool freeShipping;
 
   ProductModel({
     required this.id,
@@ -30,6 +39,7 @@ class ProductModel {
     required this.price,
     this.originalPrice = 0.0,
     required this.images,
+    this.detailImages = const [],
     required this.category,
     this.rating = 0.0,
     this.reviewCount = 0,
@@ -45,14 +55,19 @@ class ProductModel {
     this.flashSalePrice = 0.0,
     this.saleEndsAt,
     this.isFeatured = false,
+    this.discountPercent = 0.0,
+    this.showSoldCount = true,
+    this.showRating = true,
+    this.showReviewCount = true,
+    this.freeShipping = false,
   });
 
   double get effectivePrice =>
       isFlashSale && flashSalePrice > 0 ? flashSalePrice : price;
 
-  double get discountPercent => originalPrice > 0
+  double get discountPercentDisplay => originalPrice > 0
       ? ((originalPrice - effectivePrice) / originalPrice * 100).roundToDouble()
-      : 0;
+      : discountPercent;
 
   ProductModel copyWith({
     String? id,
@@ -61,6 +76,7 @@ class ProductModel {
     double? price,
     double? originalPrice,
     List<String>? images,
+    List<String>? detailImages,
     String? category,
     double? rating,
     int? reviewCount,
@@ -76,6 +92,11 @@ class ProductModel {
     double? flashSalePrice,
     DateTime? saleEndsAt,
     bool? isFeatured,
+    double? discountPercent,
+    bool? showSoldCount,
+    bool? showRating,
+    bool? showReviewCount,
+    bool? freeShipping,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -84,6 +105,7 @@ class ProductModel {
       price: price ?? this.price,
       originalPrice: originalPrice ?? this.originalPrice,
       images: images ?? this.images,
+      detailImages: detailImages ?? this.detailImages,
       category: category ?? this.category,
       rating: rating ?? this.rating,
       reviewCount: reviewCount ?? this.reviewCount,
@@ -99,6 +121,11 @@ class ProductModel {
       flashSalePrice: flashSalePrice ?? this.flashSalePrice,
       saleEndsAt: saleEndsAt ?? this.saleEndsAt,
       isFeatured: isFeatured ?? this.isFeatured,
+      discountPercent: discountPercent ?? this.discountPercent,
+      showSoldCount: showSoldCount ?? this.showSoldCount,
+      showRating: showRating ?? this.showRating,
+      showReviewCount: showReviewCount ?? this.showReviewCount,
+      freeShipping: freeShipping ?? this.freeShipping,
     );
   }
 
@@ -113,6 +140,7 @@ class ProductModel {
       price: (data['price'] ?? 0).toDouble(),
       originalPrice: (data['originalPrice'] ?? 0).toDouble(),
       images: List<String>.from(data['images'] ?? []),
+      detailImages: List<String>.from(data['detailImages'] ?? []),
       category: data['category'] ?? '',
       rating: (data['rating'] ?? 0).toDouble(),
       reviewCount: data['reviewCount'] ?? 0,
@@ -128,6 +156,11 @@ class ProductModel {
       flashSalePrice: (data['flashSalePrice'] ?? 0).toDouble(),
       saleEndsAt: (data['saleEndsAt'] as Timestamp?)?.toDate(),
       isFeatured: data['isFeatured'] ?? false,
+      discountPercent: (data['discountPercent'] ?? 0).toDouble(),
+      showSoldCount: data['showSoldCount'] ?? true,
+      showRating: data['showRating'] ?? true,
+      showReviewCount: data['showReviewCount'] ?? true,
+      freeShipping: data['freeShipping'] ?? false,
     );
   }
 
@@ -138,6 +171,7 @@ class ProductModel {
       'price': price,
       'originalPrice': originalPrice,
       'images': images,
+      'detailImages': detailImages,
       'category': category,
       'rating': rating,
       'reviewCount': reviewCount,
@@ -153,6 +187,11 @@ class ProductModel {
       'flashSalePrice': flashSalePrice,
       'saleEndsAt': saleEndsAt != null ? Timestamp.fromDate(saleEndsAt!) : null,
       'isFeatured': isFeatured,
+      'discountPercent': discountPercent,
+      'showSoldCount': showSoldCount,
+      'showRating': showRating,
+      'showReviewCount': showReviewCount,
+      'freeShipping': freeShipping,
     };
   }
 }

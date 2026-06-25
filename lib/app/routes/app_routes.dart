@@ -1,27 +1,33 @@
 import 'package:get/get.dart';
-import '../views/screens/splash_screen.dart';
-import '../views/screens/main_screen.dart';
-import '../views/screens/login_screen.dart';
-import '../views/screens/register_screen.dart';
-import '../views/screens/edit_profile_screen.dart';
-import '../views/screens/order_detail_screen.dart';
-import '../views/screens/admin_products_screen.dart';
+import '../views/screens/auth/splash_screen.dart';
+import '../views/screens/home/main_screen.dart';
+import '../views/screens/auth/login_screen.dart';
+import '../views/screens/auth/register_screen.dart';
+import '../views/screens/profile/edit_profile_screen.dart';
+import '../views/screens/order/order_detail_screen.dart';
+import '../views/screens/admin/admin_products_screen.dart';
 
-import '../views/screens/shop_screen.dart';
-import '../views/screens/product_detail_screen.dart';
-import '../views/screens/cart_screen.dart';
-import '../views/screens/checkout_screen.dart';
-import '../views/screens/profile_screen.dart';
-import '../views/screens/search_screen.dart';
-import '../views/screens/wishlist_screen.dart';
-import '../views/screens/profile_sub_screens.dart';
-import '../views/screens/add_edit_address_screen.dart';
-import '../views/screens/add_edit_card_screen.dart';
-import '../views/screens/add_edit_product_screen.dart';
-import '../views/screens/add_edit_shop_screen.dart';
-import '../views/screens/add_edit_bank_screen.dart';
+import '../views/screens/shop/shop_screen.dart';
+import '../views/screens/product/product_detail_screen.dart';
+import '../views/screens/product/all_reviews_screen.dart';
+import '../views/screens/cart/cart_screen.dart';
+import '../views/screens/checkout/checkout_screen.dart';
+import '../views/screens/profile/profile_screen.dart';
+import '../views/screens/home/search_screen.dart';
+import '../views/screens/wishlist/wishlist_screen.dart';
+import '../views/screens/profile/profile_sub_screens.dart';
+import '../views/screens/profile/add_edit_address_screen.dart';
+import '../views/screens/profile/add_edit_card_screen.dart';
+import '../views/screens/profile/shopper_history_screen.dart';
+import '../views/screens/profile/followed_shops_screen.dart';
+import '../views/screens/home/flash_sales_screen.dart';
+import '../views/screens/home/popular_shops_screen.dart';
+import '../views/screens/admin/add_edit_product_screen.dart';
+import '../views/screens/admin/add_edit_shop_screen.dart';
+import '../views/screens/profile/add_edit_bank_screen.dart';
 import '../views/screens/forgot_password_screen.dart';
 import '../controllers/theme_controller.dart';
+import '../controllers/currency_controller.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -32,6 +38,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String shop = '/shop';
   static const String productDetail = '/product-detail';
+  static const String allReviews = '/all-reviews';
   static const String cart = '/cart';
   static const String checkout = '/checkout';
   static const String profile = '/profile';
@@ -48,9 +55,13 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String notifications = '/notifications';
   static const String helpCenter = '/help-center';
+  static const String shopperHistory = '/shopper-history';
+  static const String followedShops = '/followed-shops';
   static const String adminProducts = '/admin-products';
   static const String addEditProduct = '/add-edit-product';
   static const String addEditShop = '/add-edit-shop';
+  static const String flashSales = '/flash-sales';
+  static const String popularShops = '/popular-shops';
 
   static List<GetPage> pages = [
     GetPage(
@@ -79,6 +90,7 @@ class AppRoutes {
       transition: Transition.fadeIn,
       binding: BindingsBuilder(() {
         Get.put(ThemeController(), permanent: true);
+        Get.put(CurrencyController(), permanent: true);
       }),
     ),
     GetPage(
@@ -89,6 +101,17 @@ class AppRoutes {
     GetPage(
       name: productDetail,
       page: () => const ProductDetailScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: allReviews,
+      page: () {
+        final args = Get.arguments as Map<String, String>;
+        return AllReviewsScreen(
+          productId: args['productId']!,
+          productName: args['productName']!,
+        );
+      },
       transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
@@ -172,6 +195,16 @@ class AppRoutes {
       transition: Transition.rightToLeftWithFade,
     ),
     GetPage(
+      name: shopperHistory,
+      page: () => const ShopperHistoryScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: followedShops,
+      page: () => const FollowedShopsScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
       name: adminProducts,
       page: () => const AdminProductsScreen(),
       transition: Transition.rightToLeftWithFade,
@@ -184,6 +217,16 @@ class AppRoutes {
     GetPage(
       name: addEditShop,
       page: () => const AddEditShopScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: flashSales,
+      page: () => const FlashSalesScreen(),
+      transition: Transition.rightToLeftWithFade,
+    ),
+    GetPage(
+      name: popularShops,
+      page: () => const PopularShopsScreen(),
       transition: Transition.rightToLeftWithFade,
     ),
   ];

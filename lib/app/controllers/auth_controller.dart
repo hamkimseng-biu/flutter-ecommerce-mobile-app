@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/firebase_auth_service.dart';
+import '../../config/app_snack.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuthService _authService = FirebaseAuthService();
@@ -96,6 +97,47 @@ class AuthController extends GetxController {
     }
   }
 
+  // Phone auth state
+  PhoneAuthResult? _phoneConfirmation;
+
+  /// Sends OTP to [phoneNumber] (E.164 format: +85512345678).
+  /// Returns null on success (code sent or auto-verified), or an error message.
+  Future<String?> sendPhoneOTP(String phoneNumber) async {
+    try {
+      isLoading.value = true;
+      _phoneConfirmation = await _authService.verifyPhoneNumber(phoneNumber);
+      // If verificationId is empty, auto-verification happened — user already signed in
+      if (_phoneConfirmation!.verificationId.isEmpty) {
+        _phoneConfirmation = null;
+        Get.offAllNamed('/main');
+      }
+      return null;
+    } catch (e) {
+      return e.toString();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Verifies the OTP [smsCode] and completes phone sign-in.
+  /// Returns null on success, or an error message.
+  Future<String?> verifyPhoneOTP(String smsCode) async {
+    if (_phoneConfirmation == null) {
+      return 'No verification in progress. Please try again.';
+    }
+    try {
+      isLoading.value = true;
+      await _phoneConfirmation!.signIn(smsCode);
+      _phoneConfirmation = null;
+      Get.offAllNamed('/main');
+      return null;
+    } catch (e) {
+      return e.toString();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // Send password reset email
   Future<String?> resetPassword(String email) async {
     try {
@@ -112,5 +154,16 @@ class AuthController extends GetxController {
   // Sign out
   Future<void> logout() async {
     await _authService.signOut();
+  }
+
+  /// Returns true if user is signed in. If not, shows a prompt to sign in.
+  /// Use this to guard actions that require authentication.
+  bool requireAuth({
+    String message = 'Please sign in to access this feature.',
+  }) {
+    if (isLoggedIn.value) return true;
+    AppSnack.info('Sign In Required', message);
+    Get.toNamed('/login');
+    return false;
   }
 }

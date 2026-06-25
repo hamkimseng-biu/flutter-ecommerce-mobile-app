@@ -5,6 +5,17 @@ allprojects {
     }
 }
 
+// Force consistent JVM target across all Kotlin compilation (app + plugins)
+allprojects {
+    afterEvaluate {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+}
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")

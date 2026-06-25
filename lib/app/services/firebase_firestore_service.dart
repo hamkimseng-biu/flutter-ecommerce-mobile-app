@@ -62,14 +62,15 @@ class FirebaseFirestoreService {
   // Search products with filters
   Future<List<ProductModel>> searchProducts({
     String query = '',
-    String? category,
+    List<String>? categories,
     double? minPrice,
     double? maxPrice,
     double? minRating,
   }) async {
     var q = _productsRef as Query;
-    if (category != null && category.isNotEmpty) {
-      q = q.where('category', isEqualTo: category);
+    if (categories != null && categories.isNotEmpty) {
+      // Firestore whereIn supports max 10 values
+      q = q.where('category', whereIn: categories.take(10).toList());
     }
     final snapshot = await q.get();
     var products = snapshot.docs
@@ -99,7 +100,7 @@ class FirebaseFirestoreService {
     return products;
   }
 
-  // Get all unique categories
+  // Get all unique categories from products
   Future<List<String>> getCategories() async {
     final snapshot = await _productsRef.get();
     final cats = <String>{};
@@ -109,6 +110,61 @@ class FirebaseFirestoreService {
       if (cat != null && cat.isNotEmpty) cats.add(cat);
     }
     return cats.toList()..sort();
+  }
+
+  // ═══════════════════════════════════════════
+  // CATEGORY MANAGEMENT (Admin)
+  // ═══════════════════════════════════════════
+
+  CollectionReference get _categoriesRef => _firestore.collection('categories');
+
+  Stream<List<Map<String, dynamic>>> getCategoriesStream() {
+    return _categoriesRef.orderBy('order').snapshots().map((snap) {
+      return snap.docs.map((doc) {
+        final d = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'name': d['name'] ?? '',
+          'icon': d['icon'] ?? '',
+          'order': d['order'] ?? 0,
+          'createdAt': d['createdAt'],
+        };
+      }).toList();
+    });
+  }
+
+  Future<void> saveCategory({
+    required String name,
+    required String icon,
+    String? docId,
+    int? order,
+  }) async {
+    final data = {
+      'name': name.trim(),
+      'icon': icon.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (order != null) data['order'] = order;
+    if (docId != null) {
+      await _categoriesRef.doc(docId).update(data);
+    } else {
+      data['createdAt'] = FieldValue.serverTimestamp();
+      data['order'] = order ?? DateTime.now().millisecondsSinceEpoch;
+      await _categoriesRef.add(data);
+    }
+  }
+
+  Future<void> reorderCategories(List<Map<String, dynamic>> ordered) async {
+    final batch = _firestore.batch();
+    for (int i = 0; i < ordered.length; i++) {
+      final doc = _categoriesRef.doc(ordered[i]['id'] as String);
+      batch.update(doc, {'order': i});
+    }
+    await batch.commit();
+  }
+
+  Future<void> deleteCategory(String docId) async {
+    await _categoriesRef.doc(docId).delete();
   }
 
   // ═══════════════════════════════════════════
@@ -128,10 +184,10 @@ class FirebaseFirestoreService {
     });
   }
 
-  // Add item to cart
-  Future<void> addToCart(CartItemModel item) async {
+  // Add item to cart (key = productId_size_color)
+  Future<void> addToCart(String cartItemId, CartItemModel item) async {
     if (_uid.isEmpty) return;
-    await _cartRef.doc(item.productId).set(item.toFirestore());
+    await _cartRef.doc(cartItemId).set(item.toFirestore());
   }
 
   // Update cart item quantity
@@ -144,6 +200,20 @@ class FirebaseFirestoreService {
   Future<void> removeFromCart(String productId) async {
     if (_uid.isEmpty) return;
     await _cartRef.doc(productId).delete();
+  }
+
+  // Get cart items once (snapshot)
+  Future<List<Map<String, dynamic>>> getCartItemsOnce() async {
+    if (_uid.isEmpty) return [];
+    try {
+      final snapshot = await _cartRef.get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {...data, 'firestoreId': doc.id};
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   // Clear entire cart
@@ -167,16 +237,23 @@ class FirebaseFirestoreService {
   // Get wishlist stream
   Stream<List<String>> getWishlistStream() {
     if (_uid.isEmpty) return Stream.value([]);
-    return _wishlistRef.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => doc.id).toList();
-    });
+    return _wishlistRef
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) => doc.id).toList();
+        })
+        .handleError((_) => <String>[]);
   }
 
   // Get wishlist IDs once (for initial load)
   Future<List<String>> getWishlistIds() async {
     if (_uid.isEmpty) return [];
-    final snapshot = await _wishlistRef.get();
-    return snapshot.docs.map((doc) => doc.id).toList();
+    try {
+      final snapshot = await _wishlistRef.get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   // Add to wishlist
@@ -378,6 +455,20 @@ class FirebaseFirestoreService {
     String? docId,
   }) async {
     if (_uid.isEmpty) return;
+    final isDefault = address['isDefault'] == true;
+    // If this address is the new default, unset all others first
+    if (isDefault) {
+      final batch = _firestore.batch();
+      final existing = await _addressesRef
+          .where('isDefault', isEqualTo: true)
+          .get();
+      for (final doc in existing.docs) {
+        if (doc.id != docId) {
+          batch.update(doc.reference, {'isDefault': false});
+        }
+      }
+      await batch.commit();
+    }
     final data = {
       'recipient': address['recipient'],
       'phone': address['phone'],
@@ -386,7 +477,7 @@ class FirebaseFirestoreService {
       'city': address['city'],
       'province': address['province'],
       'zip': address['zip'],
-      'isDefault': address['isDefault'],
+      'isDefault': isDefault,
     };
     if (docId != null) {
       await _addressesRef.doc(docId).update(data);
@@ -408,20 +499,28 @@ class FirebaseFirestoreService {
 
   Future<void> addRecentlyViewed(String productId) async {
     if (_uid.isEmpty) return;
-    final doc = await _userDoc.get();
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    final list = List<String>.from(data['recentlyViewed'] ?? []);
-    list.remove(productId);
-    list.insert(0, productId);
-    if (list.length > 20) list.removeRange(20, list.length);
-    await _userDoc.update({'recentlyViewed': list});
+    try {
+      final doc = await _userDoc.get();
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      final list = List<String>.from(data['recentlyViewed'] ?? []);
+      list.remove(productId);
+      list.insert(0, productId);
+      if (list.length > 20) list.removeRange(20, list.length);
+      await _userDoc.set({'recentlyViewed': list}, SetOptions(merge: true));
+    } catch (_) {
+      // Firestore permission or network error — silently ignore
+    }
   }
 
   Future<List<String>> getRecentlyViewed() async {
     if (_uid.isEmpty) return [];
-    final doc = await _userDoc.get();
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    return List<String>.from(data['recentlyViewed'] ?? []);
+    try {
+      final doc = await _userDoc.get();
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      return List<String>.from(data['recentlyViewed'] ?? []);
+    } catch (_) {
+      return [];
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -433,18 +532,22 @@ class FirebaseFirestoreService {
 
   Future<List<Map<String, dynamic>>> getCards() async {
     if (_uid.isEmpty) return [];
-    final snapshot = await _cardsRef.get();
-    return snapshot.docs.map((doc) {
-      final d = doc.data() as Map<String, dynamic>;
-      return {
-        'firestoreId': doc.id,
-        'number': d['number'] ?? '',
-        'holder': d['holder'] ?? '',
-        'expiry': d['expiry'] ?? '',
-        'brand': d['brand'] ?? 'visa',
-        'isDefault': d['isDefault'] ?? false,
-      };
-    }).toList();
+    try {
+      final snapshot = await _cardsRef.get();
+      return snapshot.docs.map((doc) {
+        final d = doc.data() as Map<String, dynamic>;
+        return {
+          'firestoreId': doc.id,
+          'number': d['number'] ?? '',
+          'holder': d['holder'] ?? '',
+          'expiry': d['expiry'] ?? '',
+          'brand': d['brand'] ?? 'visa',
+          'isDefault': d['isDefault'] ?? false,
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> saveCard(Map<String, dynamic> card, {String? docId}) async {
@@ -477,19 +580,23 @@ class FirebaseFirestoreService {
 
   Future<List<Map<String, dynamic>>> getBankAccounts() async {
     if (_uid.isEmpty) return [];
-    final snapshot = await _bankRef.get();
-    return snapshot.docs.map((doc) {
-      final d = doc.data() as Map<String, dynamic>;
-      return {
-        'firestoreId': doc.id,
-        'bankName': d['bankName'] ?? '',
-        'accountHolder': d['accountHolder'] ?? '',
-        'accountNumber': d['accountNumber'] ?? '',
-        'routingNumber': d['routingNumber'] ?? '',
-        'accountType': d['accountType'] ?? 'checking',
-        'isDefault': d['isDefault'] ?? false,
-      };
-    }).toList();
+    try {
+      final snapshot = await _bankRef.get();
+      return snapshot.docs.map((doc) {
+        final d = doc.data() as Map<String, dynamic>;
+        return {
+          'firestoreId': doc.id,
+          'bankName': d['bankName'] ?? '',
+          'accountHolder': d['accountHolder'] ?? '',
+          'accountNumber': d['accountNumber'] ?? '',
+          'routingNumber': d['routingNumber'] ?? '',
+          'accountType': d['accountType'] ?? 'checking',
+          'isDefault': d['isDefault'] ?? false,
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> saveBankAccount(
@@ -540,7 +647,8 @@ class FirebaseFirestoreService {
     return _firestore
         .collectionGroup('orders')
         .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .handleError((_) => <QueryDocumentSnapshot<Object?>>[]);
   }
 
   /// Updates an order's status (admin only).
@@ -625,6 +733,96 @@ class FirebaseFirestoreService {
       await snapshot.docs.first.reference.update({
         'usedCount': FieldValue.increment(1),
       });
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // FOLLOWED SHOPS
+  // ═══════════════════════════════════════════
+
+  CollectionReference get _followedShopsRef =>
+      _firestore.collection('users').doc(_uid).collection('followed_shops');
+
+  Future<bool> isShopFollowed(String shopId) async {
+    if (_uid.isEmpty) return false;
+    try {
+      final doc = await _followedShopsRef.doc(shopId).get();
+      return doc.exists;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> toggleFollowShop(String shopId) async {
+    if (_uid.isEmpty) return;
+    try {
+      final doc = await _followedShopsRef.doc(shopId).get();
+      if (doc.exists) {
+        await _followedShopsRef.doc(shopId).delete();
+      } else {
+        await _followedShopsRef.doc(shopId).set({
+          'followedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<List<String>> getFollowedShopIds() async {
+    if (_uid.isEmpty) return [];
+    try {
+      final snapshot = await _followedShopsRef.get();
+      return snapshot.docs.map((d) => d.id).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // SHOPPER HISTORY — get product IDs from all sources
+  // ═══════════════════════════════════════════
+
+  /// Gets product IDs the user has bought (from all orders)
+  Future<List<String>> getBoughtProductIds() async {
+    if (_uid.isEmpty) return [];
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(_uid)
+          .collection('orders')
+          .get();
+      final ids = <String>{};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final items = data['items'] as List<dynamic>? ?? [];
+        for (final item in items) {
+          final pid = (item as Map<String, dynamic>)['productId'] as String?;
+          if (pid != null && pid.isNotEmpty) ids.add(pid);
+        }
+      }
+      return ids.toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Gets product IDs the user has reviewed
+  Future<List<String>> getReviewedProductIds() async {
+    if (_uid.isEmpty) return [];
+    try {
+      final snapshot = await _firestore
+          .collectionGroup('reviews')
+          .where('userId', isEqualTo: _uid)
+          .get();
+      return snapshot.docs
+          .map((d) {
+            final data = d.data();
+            return (data['productId'] as String?) ?? '';
+          })
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 }

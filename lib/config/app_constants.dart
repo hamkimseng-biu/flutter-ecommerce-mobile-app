@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'Tiny Chicken';
-  static const String appTagline = 'Small prices, big style! 🐔';
+  static const String appTagline = 'Small prices, big style!';
   static const String baseUrl = 'https://api.tinychicken.com/v1';
 
   // Asset paths

@@ -13,13 +13,12 @@ echo ""
 adb -s emulator-5554 emu kill 2>/dev/null
 sleep 1
 
-# Launch emulator with fixes
+# Launch emulator (keeps snapshot for Gmail/settings persistence)
 set -x QT_QPA_PLATFORM xcb
-prime-run flutter emulators --launch $EMULATOR_ID &
+prime-run emulator -avd $EMULATOR_ID &
 
 # Wait for emulator to boot
 echo "Waiting for emulator to boot..."
-flutter emulators --launch $EMULATOR_ID >/dev/null 2>&1 &
 
 # Wait for device to be ready
 set timeout 120
@@ -42,5 +41,5 @@ if test $elapsed -ge $timeout
 end
 
 
-# Manually run it
-# QT_QPA_PLATFORM=xcb prime-run flutter emulators --launch Pixel_9
+# Direct cold-boot command:
+# QT_QPA_PLATFORM=xcb prime-run emulator -avd Pixel_9 -no-snapshot &

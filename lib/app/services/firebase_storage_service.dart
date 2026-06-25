@@ -22,7 +22,8 @@ class FirebaseStorageService {
 
   /// Upload a file to the 'products' folder in Firebase Storage.
   Future<String> uploadImage(File file, String fileName) async {
-    final ref = _storage.ref().child('products/$fileName');
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final ref = _storage.ref().child('products/$timestamp-$fileName');
     final uploadTask = ref.putFile(file);
     final snapshot = await uploadTask;
     return await snapshot.ref.getDownloadURL();

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/product_model.dart';
 import '../../controllers/wishlist_controller.dart';
+import '../../controllers/currency_controller.dart';
 import '../../../config/app_theme.dart';
 
 class ProductCard extends StatelessWidget {
@@ -21,6 +23,8 @@ class ProductCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final wc = Get.find<WishlistController>();
     final bg = isDark ? AppTheme.darkSurface : Colors.white;
+    // Currency controller — instantiate once at top of build
+    final curCtrl = Get.find<CurrencyController>();
 
     return GestureDetector(
       onTap: onTap,
@@ -45,44 +49,56 @@ class ProductCard extends StatelessWidget {
                       height: 150,
                       width: double.infinity,
                       child: product.images.isNotEmpty
-                          ? Image.network(
-                              product.images[0],
+                          ? CachedNetworkImage(
+                              imageUrl: product.images[0],
                               fit: BoxFit.cover,
-                              errorBuilder: (c, e, s) => _ph(),
+                              placeholder: (_, __) => _ph(),
+                              errorWidget: (_, __, ___) => _ph(),
                             )
                           : _ph(),
                     ),
                   ),
-                  if (product.discountPercent > 3)
+                  if (product.discountPercentDisplay > 3)
                     Positioned(
                       top: 6,
                       left: 6,
                       child: _b(
-                        '-${product.discountPercent.toInt()}%',
+                        '-${product.discountPercentDisplay.toInt()}%',
                         product.isFlashSale
                             ? AppTheme.flashSaleColor
                             : AppTheme.errorColor,
                       ),
                     ),
-                  if (product.isFlashSale && product.discountPercent <= 3)
+                  if (product.isFlashSale &&
+                      product.discountPercentDisplay <= 3)
                     Positioned(
                       top: 6,
                       left: 6,
                       child: _b('FLASH', Colors.amber, icon: Icons.bolt, sz: 8),
                     ),
-                  if (product.isFlashSale && product.discountPercent > 3)
+                  if (product.isFlashSale && product.discountPercentDisplay > 3)
                     Positioned(
                       top: 22,
                       left: 6,
                       child: _b('FLASH', Colors.amber, icon: Icons.bolt, sz: 8),
                     ),
-                  if (product.soldCount > 1000)
+                  if (product.showSoldCount && product.soldCount > 1000)
                     Positioned(
                       bottom: 4,
                       left: 4,
                       child: _b(
                         '${(product.soldCount / 1000).toStringAsFixed(1)}k sold',
                         isDark ? Colors.white24 : Colors.black54,
+                      ),
+                    ),
+                  if (product.freeShipping)
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: _b(
+                        'Free Ship',
+                        AppTheme.successColor.withValues(alpha: 0.85),
+                        sz: 7,
                       ),
                     ),
                   Positioned(
@@ -153,33 +169,36 @@ class ProductCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            color: AppTheme.secondaryColor,
-                            size: 12,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${product.rating}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                      if (product.showRating)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              color: AppTheme.secondaryColor,
+                              size: 12,
                             ),
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '(${product.reviewCount})',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: isDark
-                                  ? AppTheme.darkTextSecondary
-                                  : const Color(0xFF9E9EAA),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${product.rating}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            if (product.showReviewCount) ...[
+                              const SizedBox(width: 2),
+                              Text(
+                                '(${product.reviewCount})',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: isDark
+                                      ? AppTheme.darkTextSecondary
+                                      : const Color(0xFF9E9EAA),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       const Spacer(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -189,26 +208,34 @@ class ProductCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                '\$${product.effectivePrice.toStringAsFixed(2)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryColor,
+                              Obx(
+                                () => Text(
+                                  curCtrl.formatPriceCompact(
+                                    product.effectivePrice,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryColor,
+                                  ),
                                 ),
                               ),
                               if (product.originalPrice > 0 &&
-                                  product.discountPercent > 0)
-                                Text(
-                                  '\$${product.originalPrice.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? AppTheme.darkTextSecondary
-                                        : const Color(0xFF9E9EAA),
-                                    decoration: TextDecoration.lineThrough,
+                                  product.discountPercentDisplay > 0)
+                                Obx(
+                                  () => Text(
+                                    curCtrl.formatPriceCompact(
+                                      product.originalPrice,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? AppTheme.darkTextSecondary
+                                          : const Color(0xFF9E9EAA),
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
                                   ),
                                 ),
                             ],

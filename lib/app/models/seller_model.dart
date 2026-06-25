@@ -9,6 +9,7 @@ class SellerModel {
   final int productCount;
   final int followerCount;
   final bool isOfficial;
+  final bool isPopular;
   final List<String> categoryIds;
 
   SellerModel({
@@ -22,6 +23,7 @@ class SellerModel {
     this.productCount = 0,
     this.followerCount = 0,
     this.isOfficial = false,
+    this.isPopular = false,
     this.categoryIds = const [],
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -90,6 +91,75 @@ class FirebaseAuthService {
     }
   }
 
+  // ── Phone Auth ────────────────────────────────────
+
+  /// Starts phone number verification. [phoneNumber] must be in E.164 format
+  /// (e.g. +85512345678). Returns the [ConfirmationResult] which holds the
+  /// verificationId and a callback to complete sign-in with the OTP.
+  Future<PhoneAuthResult> verifyPhoneNumber(String phoneNumber) async {
+    final completer = Completer<PhoneAuthResult>();
+
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-verification (e.g. Android SMS auto-retrieve) — instant sign-in
+        final userCredential = await _auth.signInWithCredential(credential);
+        // Create/update user doc
+        await _firestore.collection('users').doc(userCredential.user!.uid).set({
+          'name': userCredential.user?.displayName ?? 'User',
+          'phone': phoneNumber,
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        if (!completer.isCompleted) {
+          completer.complete(
+            PhoneAuthResult(
+              verificationId: '',
+              signIn: (_) async => userCredential,
+            ),
+          );
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (!completer.isCompleted) {
+          completer.completeError(_handleAuthException(e));
+        }
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        if (!completer.isCompleted) {
+          completer.complete(
+            PhoneAuthResult(
+              verificationId: verificationId,
+              signIn: (String smsCode) async {
+                final credential = PhoneAuthProvider.credential(
+                  verificationId: verificationId,
+                  smsCode: smsCode,
+                );
+                final userCredential = await _auth.signInWithCredential(
+                  credential,
+                );
+                // Create user doc in Firestore
+                await _firestore
+                    .collection('users')
+                    .doc(userCredential.user!.uid)
+                    .set({
+                      'name': userCredential.user?.displayName ?? 'User',
+                      'phone': phoneNumber,
+                      'lastLoginAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+                return userCredential;
+              },
+            ),
+          );
+        }
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // No-op — timeout is expected on some devices
+      },
+    );
+
+    return completer.future;
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {
@@ -149,4 +219,12 @@ class FirebaseAuthService {
         return e.message ?? 'An unexpected error occurred. Please try again.';
     }
   }
+}
+
+/// Holds the verification ID and a callback to complete phone sign-in.
+class PhoneAuthResult {
+  final String verificationId;
+  final Future<UserCredential> Function(String smsCode) signIn;
+
+  PhoneAuthResult({required this.verificationId, required this.signIn});
 }

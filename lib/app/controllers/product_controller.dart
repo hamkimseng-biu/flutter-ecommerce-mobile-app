@@ -24,33 +24,51 @@ class ProductController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadProducts();
+    _loadFromStream();
+  }
+
+  void _loadFromStream() {
+    isLoading.value = true;
+
+    _firestoreService.getProductsStream().listen(
+      (products) {
+        if (products.isNotEmpty) {
+          allProducts.value = products;
+          filteredProducts.value = products;
+          _categorizeProducts(products);
+        }
+        _loadSellers();
+        isLoading.value = false;
+      },
+      onError: (_) {
+        isLoading.value = false;
+      },
+    );
+
+    // Listen to categories from Firestore collection (admin-managed)
+    _firestoreService.getCategoriesStream().listen((cats) {
+      categories.value = [
+        CategoryModel(id: 'all', name: 'All', icon: '🛍️'),
+        ...cats.map(
+          (c) => CategoryModel(
+            id: (c['name'] as String).toLowerCase(),
+            name: c['name'] as String,
+            icon: (c['icon'] as String?) ?? '🛍️',
+          ),
+        ),
+      ];
+    });
   }
 
   Future<void> loadProducts() async {
     isLoading.value = true;
-
-    try {
-      // Try to load from Firestore first
-      final products = await _firestoreService.getProducts();
-
-      if (products.isNotEmpty) {
-        allProducts.value = products;
-        filteredProducts.value = products;
-        _categorizeProducts(products);
-        _loadCategoriesFromProducts(products);
-      } else {
-        // Fallback to mock data
-        _loadMockData();
-      }
-    } catch (e) {
-      // Fallback to mock data on error
-      _loadMockData();
+    final products = await _firestoreService.getProducts();
+    if (products.isNotEmpty) {
+      allProducts.value = products;
+      filteredProducts.value = products;
+      _categorizeProducts(products);
     }
-
-    // Load sellers from Firestore shops collection
     _loadSellers();
-
     isLoading.value = false;
   }
 
@@ -68,6 +86,7 @@ class ProductController extends GetxController {
             banner: d['bannerUrl'] ?? '',
             description: d['description'] ?? '',
             isOfficial: d['isOfficial'] ?? false,
+            isPopular: d['isPopular'] ?? false,
           );
         }).toList();
         return;
@@ -75,6 +94,10 @@ class ProductController extends GetxController {
     } catch (_) {}
     sellers.value = MockDataService.getSellers();
   }
+
+  /// Only sellers marked as popular by admin
+  List<SellerModel> get popularSellers =>
+      sellers.where((s) => s.isPopular).toList();
 
   void _categorizeProducts(List<ProductModel> products) {
     featuredProducts.value = products.where((p) => p.isFeatured).toList();
@@ -84,46 +107,6 @@ class ProductController extends GetxController {
     trendingProducts.value = products.where((p) => p.soldCount > 50).toList();
     if (trendingProducts.isEmpty) {
       trendingProducts.value = products.take(8).toList();
-    }
-  }
-
-  void _loadCategoriesFromProducts(List<ProductModel> products) {
-    final catNames = products.map((p) => p.category).toSet().toList();
-    if (catNames.isNotEmpty) {
-      categories.value = [
-        CategoryModel(id: 'all', name: 'All', icon: '🛍️'),
-        ...catNames.map(
-          (name) => CategoryModel(
-            id: name.toLowerCase(),
-            name: name,
-            icon: _categoryIcon(name),
-          ),
-        ),
-      ];
-    }
-  }
-
-  String _categoryIcon(String name) {
-    switch (name.toLowerCase()) {
-      case 'clothing':
-      case 'fashion':
-        return '👕';
-      case 'electronics':
-      case 'tech':
-        return '📱';
-      case 'home':
-      case 'living':
-        return '🏠';
-      case 'beauty':
-        return '✨';
-      case 'sports':
-        return '⚽';
-      case 'shoes':
-        return '👟';
-      case 'accessories':
-        return '👜';
-      default:
-        return '🛍️';
     }
   }
 
@@ -142,8 +125,37 @@ class ProductController extends GetxController {
     filteredProducts.value = index == 0
         ? allProducts
         : allProducts
-              .where((p) => p.category == categories[index].name)
+              .where(
+                (p) =>
+                    p.category.toLowerCase() ==
+                    categories[index].name.toLowerCase(),
+              )
               .toList();
+  }
+
+  /// Flash sale products filtered by selected category
+  List<ProductModel> get filteredFlashSale {
+    if (selectedCategoryIndex.value == 0) return flashSaleProducts;
+    final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
+    return flashSaleProducts
+        .where((p) => p.category.toLowerCase() == cat)
+        .toList();
+  }
+
+  /// Featured products filtered by selected category
+  List<ProductModel> get filteredFeatured {
+    if (selectedCategoryIndex.value == 0) return featuredProducts;
+    final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
+    return featuredProducts
+        .where((p) => p.category.toLowerCase() == cat)
+        .toList();
+  }
+
+  /// New arrivals filtered by selected category
+  List<ProductModel> get filteredNewArrivals {
+    if (selectedCategoryIndex.value == 0) return newArrivals;
+    final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
+    return newArrivals.where((p) => p.category.toLowerCase() == cat).toList();
   }
 
   void searchProducts(String query) {

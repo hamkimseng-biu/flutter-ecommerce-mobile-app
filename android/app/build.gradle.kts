@@ -1,9 +1,7 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // Flutter's built-in Kotlin — no explicit KGP needed
     id("dev.flutter.flutter-gradle-plugin")
-    // Google Services plugin for Firebase
     id("com.google.gms.google-services")
 }
 
@@ -15,10 +13,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {

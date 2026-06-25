@@ -1,0 +1,812 @@
+// import 'package:flutter/material.dart';
+// import 'package:get/get.dart';
+// import '../../../models/product_model.dart';
+// import '../../../controllers/product_controller.dart';
+// import '../../../controllers/cart_controller.dart';
+// import '../../../controllers/home_controller.dart';
+// import '../../../services/firebase_firestore_service.dart';
+// import '../../../../../config/app_theme.dart';
+// import '../../widgets/product_card.dart';
+// import '../../widgets/flash_countdown.dart';
+// import '../../../routes/app_routes.dart';
+
+// class HomeScreen extends StatelessWidget {
+//   const HomeScreen({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final pc = Get.find<ProductController>();
+//     final cc = Get.find<CartController>();
+//     final hc = Get.find<HomeController>();
+//     final isDark = Theme.of(context).brightness == Brightness.dark;
+//     final bg = Theme.of(context).scaffoldBackgroundColor;
+
+//     return Scaffold(
+//       backgroundColor: bg,
+//       body: RefreshIndicator(
+//         onRefresh: () async => pc.loadProducts(),
+//         color: AppTheme.primaryColor,
+//         child: CustomScrollView(
+//           controller: hc.scrollController,
+//           physics: const BouncingScrollPhysics(
+//             parent: AlwaysScrollableScrollPhysics(),
+//           ),
+//           slivers: [
+//             SliverAppBar(
+//               pinned: true,
+//               elevation: 0,
+//               scrolledUnderElevation: 0.5,
+//               backgroundColor: bg,
+//               centerTitle: false,
+//               titleSpacing: 12,
+//               title: Row(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   Container(
+//                     width: 30,
+//                     height: 30,
+//                     decoration: BoxDecoration(
+//                       color: AppTheme.primaryColor.withValues(alpha: 0.12),
+//                       borderRadius: BorderRadius.circular(8),
+//                     ),
+//                     child: ClipRRect(
+//                       borderRadius: BorderRadius.circular(8),
+//                       child: Image.asset(
+//                         'assets/images/icon.png',
+//                         width: 30,
+//                         height: 30,
+//                         fit: BoxFit.cover,
+//                       ),
+//                     ),
+//                   ),
+//                   const SizedBox(width: 8),
+//                   const Text(
+//                     'Tiny Chicken',
+//                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+//                   ),
+//                 ],
+//               ),
+//               actions: [
+//                 IconButton(
+//                   icon: const Icon(Icons.search_rounded, size: 22),
+//                   onPressed: () => Get.toNamed(AppRoutes.search),
+//                   splashRadius: 20,
+//                   visualDensity: VisualDensity.compact,
+//                 ),
+//                 Obx(
+//                   () => Stack(
+//                     clipBehavior: Clip.none,
+//                     children: [
+//                       IconButton(
+//                         icon: const Icon(Icons.shopping_bag_outlined, size: 22),
+//                         onPressed: () => Get.toNamed(AppRoutes.cart),
+//                         splashRadius: 20,
+//                         visualDensity: VisualDensity.compact,
+//                       ),
+//                       if (cc.itemCount > 0)
+//                         Positioned(
+//                           right: 4,
+//                           top: 4,
+//                           child: Container(
+//                             padding: const EdgeInsets.all(3),
+//                             decoration: const BoxDecoration(
+//                               color: AppTheme.primaryColor,
+//                               shape: BoxShape.circle,
+//                             ),
+//                             child: Text(
+//                               '${cc.itemCount}',
+//                               style: const TextStyle(
+//                                 color: Colors.white,
+//                                 fontSize: 9,
+//                                 fontWeight: FontWeight.bold,
+//                               ),
+//                             ),
+//                           ),
+//                         ),
+//                     ],
+//                   ),
+//                 ),
+//                 const SizedBox(width: 4),
+//               ],
+//               bottom: PreferredSize(
+//                 preferredSize: const Size.fromHeight(86),
+//                 child: Container(
+//                   color: bg,
+//                   child: Column(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       GestureDetector(
+//                         onTap: () => Get.toNamed(AppRoutes.search),
+//                         child: Container(
+//                           margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+//                           height: 38,
+//                           decoration: BoxDecoration(
+//                             color: isDark
+//                                 ? AppTheme.darkInputFill
+//                                 : AppTheme.primaryColor.withValues(alpha: 0.05),
+//                             borderRadius: BorderRadius.circular(20),
+//                             border: Border.all(
+//                               color: AppTheme.primaryColor.withValues(
+//                                 alpha: 0.15,
+//                               ),
+//                             ),
+//                           ),
+//                           child: Row(
+//                             children: [
+//                               const SizedBox(width: 12),
+//                               const Icon(
+//                                 Icons.search_rounded,
+//                                 color: AppTheme.primaryColor,
+//                                 size: 18,
+//                               ),
+//                               const SizedBox(width: 8),
+//                               Text(
+//                                 'Search in Tiny Chicken',
+//                                 style: TextStyle(
+//                                   color: isDark
+//                                       ? AppTheme.darkTextSecondary
+//                                       : const Color(0xFFAAAAAA),
+//                                   fontSize: 13,
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+//                       ),
+//                       Obx(() {
+//                         if (pc.categories.isEmpty)
+//                           return const SizedBox.shrink();
+//                         final sel = pc.selectedCategoryIndex.value;
+//                         return SizedBox(
+//                           height: 42,
+//                           child: ListView.builder(
+//                             scrollDirection: Axis.horizontal,
+//                             padding: const EdgeInsets.symmetric(horizontal: 8),
+//                             itemCount: pc.categories.length,
+//                             itemBuilder: (ctx, i) {
+//                               final cat = pc.categories[i];
+//                               final active = sel == i;
+//                               return GestureDetector(
+//                                 onTap: () => pc.selectCategory(i),
+//                                 child: Container(
+//                                   padding: const EdgeInsets.symmetric(
+//                                     horizontal: 12,
+//                                     vertical: 6,
+//                                   ),
+//                                   margin: const EdgeInsets.symmetric(
+//                                     horizontal: 3,
+//                                     vertical: 4,
+//                                   ),
+//                                   decoration: BoxDecoration(
+//                                     color: active
+//                                         ? AppTheme.primaryColor.withValues(
+//                                             alpha: 0.1,
+//                                           )
+//                                         : (isDark
+//                                               ? AppTheme.darkSurface2
+//                                               : const Color(0xFFF5F6FA)),
+//                                     borderRadius: BorderRadius.circular(20),
+//                                     border: active
+//                                         ? Border.all(
+//                                             color: AppTheme.primaryColor,
+//                                             width: 1.5,
+//                                           )
+//                                         : null,
+//                                   ),
+//                                   child: Row(
+//                                     mainAxisSize: MainAxisSize.min,
+//                                     children: [
+//                                       Text(
+//                                         cat.icon,
+//                                         style: TextStyle(
+//                                           fontSize: active ? 17 : 15,
+//                                         ),
+//                                       ),
+//                                       const SizedBox(width: 4),
+//                                       Flexible(
+//                                         child: Text(
+//                                           cat.name,
+//                                           maxLines: 1,
+//                                           overflow: TextOverflow.ellipsis,
+//                                           style: TextStyle(
+//                                             fontSize: 11,
+//                                             fontWeight: active
+//                                                 ? FontWeight.w600
+//                                                 : FontWeight.w400,
+//                                             color: active
+//                                                 ? AppTheme.primaryColor
+//                                                 : (isDark
+//                                                       ? AppTheme
+//                                                             .darkTextSecondary
+//                                                       : const Color(
+//                                                           0xFF666666,
+//                                                         )),
+//                                           ),
+//                                         ),
+//                                       ),
+//                                     ],
+//                                   ),
+//                                 ),
+//                               );
+//                             },
+//                           ),
+//                         );
+//                       }),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ),
+
+//             SliverToBoxAdapter(
+//               child: Padding(
+//                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+//                 child: _banner(),
+//               ),
+//             ),
+
+//             SliverToBoxAdapter(
+//               child: Obx(() {
+//                 final items = pc.filteredFlashSale;
+//                 if (items.isEmpty) return const SizedBox(height: 30);
+//                 return Padding(
+//                   padding: const EdgeInsets.only(top: 30),
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       // ── SPACER DIVIDER ────────────────
+//                       Container(
+//                         height: 4,
+//                         color: Colors.orange,
+//                         margin: const EdgeInsets.only(bottom: 8),
+//                       ),
+//                       Padding(
+//                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+//                         child: Row(
+//                           children: [
+//                             Container(
+//                               padding: const EdgeInsets.symmetric(
+//                                 horizontal: 8,
+//                                 vertical: 4,
+//                               ),
+//                               decoration: BoxDecoration(
+//                                 color: AppTheme.flashSaleColor,
+//                                 borderRadius: BorderRadius.circular(14),
+//                               ),
+//                               child: const Row(
+//                                 mainAxisSize: MainAxisSize.min,
+//                                 children: [
+//                                   Icon(
+//                                     Icons.bolt,
+//                                     size: 14,
+//                                     color: Colors.white,
+//                                   ),
+//                                   Text(
+//                                     'Flash Deals',
+//                                     style: TextStyle(
+//                                       color: Colors.white,
+//                                       fontSize: 12,
+//                                       fontWeight: FontWeight.bold,
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                             ),
+//                             const SizedBox(width: 8),
+//                             _buildFlashCountdown(items),
+//                             const Spacer(),
+//                             GestureDetector(
+//                               onTap: () => Get.toNamed(AppRoutes.flashSales),
+//                               child: const Text(
+//                                 'More',
+//                                 style: TextStyle(
+//                                   fontSize: 13,
+//                                   color: Color(0xFF999999),
+//                                 ),
+//                               ),
+//                             ),
+//                             const SizedBox(width: 2),
+//                             const Icon(
+//                               Icons.chevron_right,
+//                               size: 16,
+//                               color: Color(0xFF999999),
+//                             ),
+//                           ],
+//                         ),
+//                       ),
+//                       SizedBox(
+//                         height: 270,
+//                         child: ListView.builder(
+//                           scrollDirection: Axis.horizontal,
+//                           padding: const EdgeInsets.symmetric(horizontal: 8),
+//                           itemCount: items.length,
+//                           itemBuilder: (ctx, i) => Padding(
+//                             padding: const EdgeInsets.symmetric(horizontal: 4),
+//                             child: SizedBox(
+//                               width: 170,
+//                               child: ProductCard(
+//                                 product: items[i],
+//                                 onTap: () => Get.toNamed(
+//                                   AppRoutes.productDetail,
+//                                   arguments: items[i],
+//                                 ),
+//                                 onAddToCart: () => cc.addToCart(items[i]),
+//                               ),
+//                             ),
+//                           ),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 );
+//               }),
+//             ),
+
+//             // ═══ RECENTLY VIEWED ═══
+//             SliverToBoxAdapter(
+//               child: Obx(() {
+//                 // Rebuild when category changes
+//                 final _ = pc.selectedCategoryIndex.value;
+//                 return Padding(
+//                   padding: const EdgeInsets.only(top: 22),
+//                   child: _RecentlyViewedSection(pc: pc, cc: cc, isDark: isDark),
+//                 );
+//               }),
+//             ),
+
+//             SliverToBoxAdapter(
+//               child: Obx(() {
+//                 final sellers = pc.popularSellers;
+//                 if (sellers.isEmpty) return const SizedBox(height: 30);
+//                 return Padding(
+//                   padding: const EdgeInsets.only(top: 30),
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Container(
+//                         height: 4,
+//                         color: Colors.green,
+//                         margin: const EdgeInsets.only(bottom: 8),
+//                       ),
+//                       Padding(
+//                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+//                         child: Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             const Text(
+//                               'Popular Shops',
+//                               style: TextStyle(
+//                                 fontSize: 16,
+//                                 fontWeight: FontWeight.bold,
+//                               ),
+//                             ),
+//                             GestureDetector(
+//                               onTap: () => Get.toNamed(AppRoutes.popularShops),
+//                               child: const Row(
+//                                 mainAxisSize: MainAxisSize.min,
+//                                 children: [
+//                                   Text(
+//                                     'See All',
+//                                     style: TextStyle(
+//                                       fontSize: 12,
+//                                       color: Color(0xFF999999),
+//                                     ),
+//                                   ),
+//                                   SizedBox(width: 2),
+//                                   Icon(
+//                                     Icons.chevron_right,
+//                                     size: 14,
+//                                     color: Color(0xFF999999),
+//                                   ),
+//                                 ],
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//                       ),
+//                       SizedBox(
+//                         height: 90,
+//                         child: ListView.builder(
+//                           scrollDirection: Axis.horizontal,
+//                           padding: const EdgeInsets.symmetric(horizontal: 12),
+//                           itemCount: sellers.length,
+//                           itemBuilder: (ctx, i) {
+//                             final s = sellers[i];
+//                             return GestureDetector(
+//                               onTap: () =>
+//                                   Get.toNamed(AppRoutes.shop, arguments: s),
+//                               child: Container(
+//                                 width: 100,
+//                                 margin: const EdgeInsets.only(right: 10),
+//                                 padding: const EdgeInsets.symmetric(
+//                                   vertical: 8,
+//                                   horizontal: 8,
+//                                 ),
+//                                 decoration: BoxDecoration(
+//                                   color: isDark
+//                                       ? AppTheme.darkSurface2
+//                                       : const Color(0xFFF8F9FA),
+//                                   borderRadius: BorderRadius.circular(14),
+//                                   border: Border.all(
+//                                     color: s.isOfficial
+//                                         ? AppTheme.primaryColor.withValues(
+//                                             alpha: 0.35,
+//                                           )
+//                                         : (isDark
+//                                               ? Colors.white12
+//                                               : const Color(0xFFE0E0E0)),
+//                                     width: s.isOfficial ? 1.5 : 1,
+//                                   ),
+//                                 ),
+//                                 child: Column(
+//                                   mainAxisAlignment: MainAxisAlignment.center,
+//                                   children: [
+//                                     Container(
+//                                       width: 44,
+//                                       height: 44,
+//                                       decoration: BoxDecoration(
+//                                         color: Colors.white,
+//                                         borderRadius: BorderRadius.circular(12),
+//                                         boxShadow: [
+//                                           BoxShadow(
+//                                             color: Colors.black.withValues(
+//                                               alpha: 0.06,
+//                                             ),
+//                                             blurRadius: 4,
+//                                             offset: const Offset(0, 2),
+//                                           ),
+//                                         ],
+//                                       ),
+//                                       child: s.logoUrl.isNotEmpty
+//                                           ? ClipRRect(
+//                                               borderRadius:
+//                                                   BorderRadius.circular(12),
+//                                               child: Image.network(
+//                                                 s.logoUrl,
+//                                                 fit: BoxFit.cover,
+//                                                 width: 44,
+//                                                 height: 44,
+//                                               ),
+//                                             )
+//                                           : Center(
+//                                               child: Text(
+//                                                 s.avatar,
+//                                                 style: const TextStyle(
+//                                                   fontSize: 22,
+//                                                 ),
+//                                               ),
+//                                             ),
+//                                     ),
+//                                     const SizedBox(height: 4),
+//                                     Text(
+//                                       s.name,
+//                                       style: TextStyle(
+//                                         fontSize: 10,
+//                                         fontWeight: FontWeight.w600,
+//                                         color: isDark
+//                                             ? AppTheme.darkTextPrimary
+//                                             : AppTheme.lightTextPrimary,
+//                                       ),
+//                                       maxLines: 1,
+//                                       overflow: TextOverflow.ellipsis,
+//                                       textAlign: TextAlign.center,
+//                                     ),
+//                                   ],
+//                                 ),
+//                               ),
+//                             );
+//                           },
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 );
+//               }),
+//             ),
+
+//             SliverToBoxAdapter(
+//               child: Obx(() {
+//                 if (pc.isLoading.value)
+//                   return Padding(
+//                     padding: const EdgeInsets.fromLTRB(12, 50, 12, 20),
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.start,
+//                       children: [
+//                         Row(
+//                           children: [
+//                             Container(
+//                               width: 3,
+//                               height: 16,
+//                               decoration: BoxDecoration(
+//                                 color: AppTheme.primaryColor,
+//                                 borderRadius: BorderRadius.circular(2),
+//                               ),
+//                             ),
+//                             const SizedBox(width: 8),
+//                             const Text(
+//                               'Guess You Like',
+//                               style: TextStyle(
+//                                 fontSize: 16,
+//                                 fontWeight: FontWeight.bold,
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//                         const SizedBox(height: 8),
+//                         _shimmerGrid(),
+//                       ],
+//                     ),
+//                   );
+//                 final items = pc.filteredProducts;
+//                 return Padding(
+//                   padding: const EdgeInsets.fromLTRB(12, 22, 12, 20),
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       Row(
+//                         children: [
+//                           Container(
+//                             width: 3,
+//                             height: 16,
+//                             decoration: BoxDecoration(
+//                               color: AppTheme.primaryColor,
+//                               borderRadius: BorderRadius.circular(2),
+//                             ),
+//                           ),
+//                           const SizedBox(width: 8),
+//                           const Text(
+//                             'Guess You Like',
+//                             style: TextStyle(
+//                               fontSize: 16,
+//                               fontWeight: FontWeight.bold,
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                       const SizedBox(height: 6),
+//                       GridView.builder(
+//                         shrinkWrap: true,
+//                         physics: const NeverScrollableScrollPhysics(),
+//                         gridDelegate:
+//                             const SliverGridDelegateWithFixedCrossAxisCount(
+//                               crossAxisCount: 2,
+//                               childAspectRatio: 0.68,
+//                               crossAxisSpacing: 8,
+//                               mainAxisSpacing: 8,
+//                             ),
+//                         itemCount: items.length,
+//                         itemBuilder: (ctx, i) => ProductCard(
+//                           product: items[i],
+//                           onTap: () => Get.toNamed(
+//                             AppRoutes.productDetail,
+//                             arguments: items[i],
+//                           ),
+//                           onAddToCart: () => cc.addToCart(items[i]),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 );
+//               }),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _banner() => Container(
+//     height: 100,
+//     decoration: BoxDecoration(
+//       borderRadius: BorderRadius.circular(14),
+//       gradient: const LinearGradient(
+//         colors: [Color(0xFFFF6B35), Color(0xFFFF8C42)],
+//         begin: Alignment.topLeft,
+//         end: Alignment.bottomRight,
+//       ),
+//     ),
+//     child: Stack(
+//       children: [
+//         Positioned(
+//           right: 0,
+//           top: 0,
+//           bottom: 0,
+//           child: Container(
+//             width: 120,
+//             decoration: BoxDecoration(
+//               color: Colors.white.withValues(alpha: 0.08),
+//               borderRadius: const BorderRadius.horizontal(
+//                 right: Radius.circular(14),
+//               ),
+//             ),
+//           ),
+//         ),
+//         Positioned(
+//           right: 12,
+//           top: 0,
+//           bottom: 0,
+//           child: Center(child: Text('🛍️', style: TextStyle(fontSize: 38))),
+//         ),
+//         Padding(
+//           padding: const EdgeInsets.fromLTRB(16, 12, 110, 12),
+//           child: Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+//                 decoration: BoxDecoration(
+//                   color: Colors.white.withValues(alpha: 0.2),
+//                   borderRadius: BorderRadius.circular(10),
+//                 ),
+//                 child: const Text(
+//                   'NEW SEASON',
+//                   style: TextStyle(
+//                     color: Colors.white,
+//                     fontSize: 10,
+//                     fontWeight: FontWeight.bold,
+//                     letterSpacing: 1,
+//                   ),
+//                 ),
+//               ),
+//               const SizedBox(height: 5),
+//               const Text(
+//                 'Summer Collection',
+//                 style: TextStyle(
+//                   color: Colors.white,
+//                   fontSize: 17,
+//                   fontWeight: FontWeight.bold,
+//                 ),
+//               ),
+//               const SizedBox(height: 1),
+//               Text(
+//                 'Up to 50% off',
+//                 style: TextStyle(
+//                   color: Colors.white.withValues(alpha: 0.85),
+//                   fontSize: 12,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+
+//   Widget _buildFlashCountdown(List<ProductModel> items) {
+//     // Use the earliest ending flash sale, or default to 24h from now
+//     DateTime? endTime;
+//     for (final p in items) {
+//       if (p.saleEndsAt != null) {
+//         if (endTime == null || p.saleEndsAt!.isBefore(endTime)) {
+//           endTime = p.saleEndsAt;
+//         }
+//       }
+//     }
+//     endTime ??= DateTime.now().add(const Duration(hours: 24));
+//     return FlashCountdown(endTime: endTime);
+//   }
+
+//   // ── Shimmer placeholder for loading ──
+//   Widget _shimmerGrid() => GridView.builder(
+//     shrinkWrap: true,
+//     physics: const NeverScrollableScrollPhysics(),
+//     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+//       crossAxisCount: 2,
+//       childAspectRatio: 0.68,
+//       crossAxisSpacing: 8,
+//       mainAxisSpacing: 8,
+//     ),
+//     itemCount: 6,
+//     itemBuilder: (_, __) => Container(
+//       decoration: BoxDecoration(
+//         color: Colors.grey.shade200,
+//         borderRadius: BorderRadius.circular(12),
+//       ),
+//     ),
+//   );
+// }
+
+// // ═══════════════════════════════════════════════════════
+// // RECENTLY VIEWED SECTION (inside HomeScreen)
+// // ═══════════════════════════════════════════════════════
+// class _RecentlyViewedSection extends StatefulWidget {
+//   final ProductController pc;
+//   final CartController cc;
+//   final bool isDark;
+//   const _RecentlyViewedSection({
+//     required this.pc,
+//     required this.cc,
+//     required this.isDark,
+//   });
+
+//   @override
+//   State<_RecentlyViewedSection> createState() => _RecentlyViewedSectionState();
+// }
+
+// class _RecentlyViewedSectionState extends State<_RecentlyViewedSection> {
+//   final _firestoreService = FirebaseFirestoreService();
+//   List<ProductModel> _recentProducts = [];
+//   bool _loaded = false;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadRecent();
+//   }
+
+//   Future<void> _loadRecent() async {
+//     final ids = await _firestoreService.getRecentlyViewed();
+//     if (ids.isEmpty) {
+//       setState(() => _loaded = true);
+//       return;
+//     }
+//     final products = <ProductModel>[];
+//     for (final id in ids) {
+//       final p = widget.pc.getProductById(id);
+//       if (p != null) products.add(p);
+//     }
+//     if (mounted)
+//       setState(() {
+//         _recentProducts = products;
+//         _loaded = true;
+//       });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     if (!_loaded || _recentProducts.isEmpty) return const SizedBox.shrink();
+
+//     // Filter by selected category
+//     final selIdx = widget.pc.selectedCategoryIndex.value;
+//     List<ProductModel> filtered;
+//     if (selIdx == 0 || widget.pc.categories.isEmpty) {
+//       filtered = _recentProducts;
+//     } else {
+//       final cat = widget.pc.categories[selIdx].name;
+//       filtered = _recentProducts.where((p) => p.category == cat).toList();
+//     }
+//     if (filtered.isEmpty) return const SizedBox.shrink();
+
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Padding(
+//           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+//           child: Row(
+//             children: [
+//               const Icon(Icons.history, size: 16, color: AppTheme.primaryColor),
+//               const SizedBox(width: 6),
+//               const Text(
+//                 'Recently Viewed',
+//                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+//               ),
+//             ],
+//           ),
+//         ),
+//         SizedBox(
+//           height: 270,
+//           child: ListView.builder(
+//             scrollDirection: Axis.horizontal,
+//             padding: const EdgeInsets.symmetric(horizontal: 8),
+//             itemCount: filtered.length,
+//             itemBuilder: (ctx, i) => Padding(
+//               padding: const EdgeInsets.symmetric(horizontal: 4),
+//               child: SizedBox(
+//                 width: 170,
+//                 child: ProductCard(
+//                   product: filtered[i],
+//                   onTap: () => Get.toNamed(
+//                     AppRoutes.productDetail,
+//                     arguments: filtered[i],
+//                   ),
+//                   onAddToCart: () => widget.cc.addToCart(filtered[i]),
+//                 ),
+//               ),
+//             ),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }

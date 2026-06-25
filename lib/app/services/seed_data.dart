@@ -5,14 +5,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class SeedDataService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Seeds 12 demo products + 3 promo codes into Firestore.
-  /// Skips items that already exist (checked by name).
+  /// Seeds all: products + orders + shops + categories + promo codes.
   static Future<Map<String, int>> seedAll() async {
     int added = 0, skipped = 0;
 
-    await _seedPromoCodes();
-    await _seedShops();
+    await seedPromoCodes();
+    await seedShops();
+    await seedCategories();
+    final r = await seedProducts();
+    added += r['added']!;
+    skipped += r['skipped']!;
 
+    return {'added': added, 'skipped': skipped};
+  }
+
+  /// Seeds demo products only.
+  static Future<Map<String, int>> seedProducts() async {
+    int added = 0, skipped = 0;
     for (final product in _products) {
       try {
         final existing = await _firestore
@@ -29,6 +38,19 @@ class SeedDataService {
           data['colors'] = _defaultColors(data['category'] as String);
         }
         data['createdAt'] = FieldValue.serverTimestamp();
+        // Ensure new model fields are present
+        data['detailImages'] ??= <String>[];
+        data['discountPercent'] ??= (data['originalPrice'] as num) > 0
+            ? (((data['originalPrice'] as num) - (data['price'] as num)) /
+                      (data['originalPrice'] as num) *
+                      100)
+                  .roundToDouble()
+            : 0.0;
+        data['showSoldCount'] ??= true;
+        data['showRating'] ??= true;
+        data['showReviewCount'] ??= true;
+        data['freeShipping'] ??=
+            (data['sellerName'] == 'Tiny Chicken Official');
         await _firestore.collection('products').add(data);
         added++;
       } catch (_) {
@@ -38,7 +60,8 @@ class SeedDataService {
     return {'added': added, 'skipped': skipped};
   }
 
-  static Future<void> _seedPromoCodes() async {
+  /// Seeds 3 demo promo codes.
+  static Future<void> seedPromoCodes() async {
     final codes = [
       {
         'code': 'CHICKEN10',
@@ -80,43 +103,50 @@ class SeedDataService {
     }
   }
 
-  static Future<void> _seedShops() async {
+  /// Seeds 6 demo shops.
+  static Future<void> seedShops() async {
     final shops = [
       {
         'name': 'Tiny Chicken Official',
         'description': 'Your go-to store for quality fashion',
         'avatar': '🐔',
         'isOfficial': true,
+        'isPopular': true,
       },
       {
         'name': 'Urban Streetwear',
         'description': 'Trendy urban fashion',
         'avatar': '🧢',
         'isOfficial': false,
+        'isPopular': true,
       },
       {
         'name': 'TechGear Hub',
         'description': 'Latest gadgets & electronics',
         'avatar': '🎧',
         'isOfficial': false,
+        'isPopular': true,
       },
       {
         'name': 'SportFlex',
         'description': 'Athletic gear & footwear',
         'avatar': '⚽',
         'isOfficial': false,
+        'isPopular': false,
       },
       {
         'name': 'HomeStyle Living',
         'description': 'Home essentials & decor',
         'avatar': '🏠',
         'isOfficial': false,
+        'isPopular': false,
       },
       {
         'name': 'BeautyGlow',
         'description': 'Skincare & beauty products',
         'avatar': '✨',
         'isOfficial': false,
+        'isPopular': false,
       },
     ];
     for (final s in shops) {
@@ -131,6 +161,153 @@ class SeedDataService {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
+    }
+  }
+
+  /// Seeds 10 demo categories.
+  static Future<void> seedCategories() async {
+    final cats = [
+      {'name': 'Clothing', 'icon': '👕'},
+      {'name': 'Shoes', 'icon': '👟'},
+      {'name': 'Accessories', 'icon': '👜'},
+      {'name': 'Beauty', 'icon': '✨'},
+      {'name': 'Electronics', 'icon': '📱'},
+      {'name': 'Home & Living', 'icon': '🏠'},
+      {'name': 'Sports', 'icon': '⚽'},
+      {'name': 'Books', 'icon': '📚'},
+      {'name': 'Food & Drinks', 'icon': '🍕'},
+      {'name': 'Toys & Games', 'icon': '🎮'},
+    ];
+    for (final c in cats) {
+      final existing = await _firestore
+          .collection('categories')
+          .where('name', isEqualTo: c['name'])
+          .limit(1)
+          .get();
+      if (existing.docs.isEmpty) {
+        await _firestore.collection('categories').add({
+          ...c,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  /// Seeds 4 demo orders for a demo user (creates user doc if needed).
+  static Future<void> seedOrders() async {
+    const demoUid = 'demo_user_seed';
+    // Ensure demo user doc exists
+    await _firestore.collection('users').doc(demoUid).set({
+      'name': 'Demo User',
+      'email': 'demo@example.com',
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    final ordersRef = _firestore
+        .collection('users')
+        .doc(demoUid)
+        .collection('orders');
+
+    final existing = await ordersRef.limit(1).get();
+    if (existing.docs.isNotEmpty) return; // Already seeded
+
+    final now = DateTime.now();
+    final orders = [
+      {
+        'status': 'Delivered',
+        'daysAgo': 5,
+        'items': [
+          {
+            'productId': '',
+            'name': 'Classic White T-Shirt',
+            'image':
+                'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
+            'price': 19.99,
+            'quantity': 2,
+          },
+          {
+            'productId': '',
+            'name': 'Vintage Denim Jacket',
+            'image':
+                'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=200&h=200&fit=crop',
+            'price': 89.99,
+            'quantity': 1,
+          },
+        ],
+      },
+      {
+        'status': 'Processing',
+        'daysAgo': 1,
+        'items': [
+          {
+            'productId': '',
+            'name': 'Wireless Bluetooth Earbuds',
+            'image':
+                'https://images.unsplash.com/photo-1590658268037-6bf12f032f55?w=200&h=200&fit=crop',
+            'price': 59.99,
+            'quantity': 1,
+          },
+        ],
+      },
+      {
+        'status': 'Shipping',
+        'daysAgo': 3,
+        'items': [
+          {
+            'productId': '',
+            'name': 'Premium Leather Sneakers',
+            'image':
+                'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=200&h=200&fit=crop',
+            'price': 129.99,
+            'quantity': 1,
+          },
+          {
+            'productId': '',
+            'name': 'Silk Evening Gown',
+            'image':
+                'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=200&h=200&fit=crop',
+            'price': 199.99,
+            'quantity': 1,
+          },
+        ],
+      },
+      {
+        'status': 'Cancelled',
+        'daysAgo': 7,
+        'items': [
+          {
+            'productId': '',
+            'name': 'Smart Watch Pro',
+            'image':
+                'https://images.unsplash.com/photo-1546868871-af0de0ae72be?w=200&h=200&fit=crop',
+            'price': 249.99,
+            'quantity': 1,
+          },
+        ],
+      },
+    ];
+
+    for (final o in orders) {
+      final items = (o['items'] as List).cast<Map<String, dynamic>>();
+      final subtotal = items.fold<double>(
+        0,
+        (s, i) => s + ((i['price'] as num) * (i['quantity'] as int)),
+      );
+      await ordersRef.add({
+        'items': items,
+        'subtotal': subtotal,
+        'tax': subtotal * 0.1,
+        'shipping': 5.99,
+        'discount': 0,
+        'total': subtotal + subtotal * 0.1 + 5.99,
+        'promoCode': '',
+        'paymentMethod': 'Credit Card',
+        'status': o['status'],
+        'createdAt': Timestamp.fromDate(
+          now.subtract(Duration(days: o['daysAgo'] as int)),
+        ),
+        'userId': demoUid,
+      });
     }
   }
 

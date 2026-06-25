@@ -85,7 +85,7 @@ class AppSnack {
         ),
       ],
       icon: null,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 5),
       isDismissible: true,
       dismissDirection: DismissDirection.horizontal,
       forwardAnimationCurve: Curves.easeOutBack,

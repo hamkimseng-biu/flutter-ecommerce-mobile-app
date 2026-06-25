@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
 import '../services/firebase_firestore_service.dart';
 import '../../config/app_snack.dart';
+import 'auth_controller.dart';
 
 class WishlistController extends GetxController {
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
@@ -55,6 +56,11 @@ class WishlistController extends GetxController {
   }
 
   Future<void> toggleWishlist(ProductModel product) async {
+    final auth = Get.find<AuthController>();
+    if (!auth.isLoggedIn.value) {
+      auth.requireAuth(message: 'Sign in to save items to your wishlist.');
+      return;
+    }
     if (isInWishlist(product.id)) {
       wishlistItems.removeWhere((p) => p.id == product.id);
       try {

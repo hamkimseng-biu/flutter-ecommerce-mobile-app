@@ -8,6 +8,9 @@ class CartItemModel {
   int quantity;
   String selectedSize;
   String selectedColor;
+  String sellerId;
+  String sellerName;
+  bool freeShipping;
 
   CartItemModel({
     required this.productId,
@@ -17,6 +20,9 @@ class CartItemModel {
     this.quantity = 1,
     this.selectedSize = 'M',
     this.selectedColor = '',
+    this.sellerId = '',
+    this.sellerName = '',
+    this.freeShipping = false,
   });
 
   double get totalPrice => price * quantity;
@@ -26,24 +32,31 @@ class CartItemModel {
   factory CartItemModel.fromFirestore(DocumentSnapshot<Object?> doc) {
     final data = doc.data()! as Map<String, dynamic>;
     return CartItemModel(
-      productId: doc.id,
+      productId: data['productId'] as String? ?? '',
       name: data['name'] ?? '',
       image: data['image'] ?? '',
       price: (data['price'] ?? 0).toDouble(),
       quantity: data['quantity'] ?? 1,
       selectedSize: data['selectedSize'] ?? 'M',
       selectedColor: data['selectedColor'] ?? '',
+      sellerId: data['sellerId'] ?? '',
+      sellerName: data['sellerName'] ?? '',
+      freeShipping: data['freeShipping'] ?? false,
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
+      'productId': productId,
       'name': name,
       'image': image,
       'price': price,
       'quantity': quantity,
       'selectedSize': selectedSize,
       'selectedColor': selectedColor,
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'freeShipping': freeShipping,
     };
   }
 }
