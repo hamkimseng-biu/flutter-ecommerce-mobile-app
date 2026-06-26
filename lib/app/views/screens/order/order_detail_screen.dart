@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../../config/app_theme.dart';
 import '../../../../../config/app_snack.dart';
+import '../../../config/app_dialog.dart';
 import '../../../services/firebase_firestore_service.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -456,36 +457,21 @@ class OrderDetailScreen extends StatelessWidget {
 
   void _cancelOrder(BuildContext context, String? firestoreId) {
     if (firestoreId == null) return;
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Cancel Order',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Are you sure you want to cancel this order?',
-          style: TextStyle(color: Color(0xFF9E9EAA)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('No')),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back();
-              try {
-                await FirebaseFirestoreService().cancelOrder(firestoreId);
-                AppSnack.success('Cancelled', 'Your order has been cancelled.');
-              } catch (_) {
-                AppSnack.error('Error', 'Could not cancel order. Try again.');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text('Yes, Cancel'),
-          ),
-        ],
-      ),
-    );
+    AppDialog.confirm(
+      title: 'Cancel Order',
+      message: 'Are you sure you want to cancel this order?',
+      confirmLabel: 'Yes, Cancel',
+      confirmColor: AppTheme.errorColor,
+    ).then((confirmed) {
+      if (confirmed != true) return;
+      FirebaseFirestoreService()
+          .cancelOrder(firestoreId)
+          .then((_) {
+            AppSnack.success('Cancelled', 'Your order has been cancelled.');
+          })
+          .catchError((_) {
+            AppSnack.error('Error', 'Could not cancel order. Try again.');
+          });
+    });
   }
 }

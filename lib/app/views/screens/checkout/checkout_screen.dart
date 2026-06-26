@@ -847,10 +847,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ),
                           const Spacer(),
-                          const Icon(
-                            Icons.chevron_right,
-                            size: 20,
-                            color: Color(0xFF9E9EAA),
+                          GestureDetector(
+                            onTap: _showPaymentPicker,
+                            child: const Text(
+                              'Change',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -879,6 +885,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Taobao-style fixed bottom bar
       bottomNavigationBar: Obx(() {
         final cc = Get.find<CartController>();
+        final curCtrl = Get.find<CurrencyController>();
         final hasSelection = cc.selectedItems.isNotEmpty;
         final displayTotal = hasSelection ? cc.selectedTotal : 0.0;
         final itemCount = hasSelection ? cc.selectedCount : 0;
@@ -910,7 +917,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       ),
                       Text(
-                        '\$${displayTotal.toStringAsFixed(2)}',
+                        curCtrl.formatPrice(displayTotal),
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,

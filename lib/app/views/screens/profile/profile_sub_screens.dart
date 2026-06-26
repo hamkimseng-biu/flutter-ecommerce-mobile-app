@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../../config/app_theme.dart';
 import '../../../../../config/app_snack.dart';
+import '../../../config/app_dialog.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/firebase_firestore_service.dart';
 import '../../../services/fcm_service.dart';
@@ -180,27 +181,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _clearAllInTab() async {
     final tab = _tabs[_activeTab];
-    final confirm = await Get.dialog<bool>(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Clear $tab Orders'),
-        content: Text(
-          _activeTab == 0
-              ? 'Delete ALL orders? This cannot be undone.'
-              : 'Delete all orders in "$tab"? This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Get.back(result: true),
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
+    final confirm = await AppDialog.confirm(
+      title: 'Clear $tab Orders',
+      message: _activeTab == 0
+          ? 'Delete ALL orders? This cannot be undone.'
+          : 'Delete all orders in "$tab"? This cannot be undone.',
+      confirmLabel: 'Delete All',
+      confirmColor: AppTheme.errorColor,
     );
     if (confirm != true) return;
 
@@ -396,80 +383,51 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void _cancelOrderFromList(Map<String, dynamic> o) {
     final fid = o['firestoreId'] as String?;
     if (fid == null) return;
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Cancel Order',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Cancel this order?',
-          style: TextStyle(color: Color(0xFF9E9EAA)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('No')),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back();
-              try {
-                await _firestoreService.cancelOrder(fid);
-                AppSnack.success('Cancelled', 'Order has been cancelled.');
-              } catch (_) {
-                AppSnack.error('Error', 'Could not cancel order.');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text('Yes, Cancel'),
-          ),
-        ],
-      ),
-    );
+    AppDialog.confirm(
+      title: 'Cancel Order',
+      message: 'Cancel this order?',
+      confirmLabel: 'Yes, Cancel',
+      confirmColor: AppTheme.errorColor,
+    ).then((confirmed) {
+      if (confirmed != true) return;
+      _firestoreService
+          .cancelOrder(fid)
+          .then((_) {
+            AppSnack.success('Cancelled', 'Order has been cancelled.');
+          })
+          .catchError((_) {
+            AppSnack.error('Error', 'Could not cancel order.');
+          });
+    });
   }
 
   void _confirmArrival(Map<String, dynamic> o) {
     final fid = o['firestoreId'] as String?;
     if (fid == null) return;
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Confirm Arrival',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Have you received this order?',
-          style: TextStyle(color: Color(0xFF9E9EAA)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Not yet')),
-          FilledButton(
-            onPressed: () async {
-              Get.back();
-              try {
-                await _firestoreService.adminUpdateOrderStatus(
-                  userId: FirebaseFirestoreService().currentUserId,
-                  orderId: fid,
-                  newStatus: 'Delivered',
-                );
-                AppSnack.success(
-                  'Confirmed',
-                  'Order marked as delivered. You can now review the products.',
-                );
-              } catch (_) {
-                AppSnack.error('Error', 'Could not confirm arrival.');
-              }
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.successColor,
-            ),
-            child: const Text('Yes, Received'),
-          ),
-        ],
-      ),
-    );
+    AppDialog.confirm(
+      title: 'Confirm Arrival',
+      message: 'Have you received this order?',
+      confirmLabel: 'Yes, Received',
+      cancelLabel: 'Not yet',
+      confirmColor: AppTheme.successColor,
+    ).then((confirmed) {
+      if (confirmed != true) return;
+      _firestoreService
+          .adminUpdateOrderStatus(
+            userId: FirebaseFirestoreService().currentUserId,
+            orderId: fid,
+            newStatus: 'Delivered',
+          )
+          .then((_) {
+            AppSnack.success(
+              'Confirmed',
+              'Order marked as delivered. You can now review the products.',
+            );
+          })
+          .catchError((_) {
+            AppSnack.error('Error', 'Could not confirm arrival.');
+          });
+    });
   }
 
   Future<void> _deleteOrder(Map<String, dynamic> o) async {

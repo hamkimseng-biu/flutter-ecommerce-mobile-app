@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../controllers/cart_controller.dart';
 import '../../controllers/product_controller.dart';
 import '../../../config/app_theme.dart';
+import '../../config/app_dialog.dart';
 import '../../routes/app_routes.dart';
 
 class CartScreen extends StatelessWidget {
@@ -22,36 +23,14 @@ class CartScreen extends StatelessWidget {
             () => cc.cartItems.isNotEmpty
                 ? IconButton(
                     onPressed: () {
-                      Get.dialog(
-                        AlertDialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          title: const Text('Clear Cart?'),
-                          content: const Text(
-                            'Remove all items from your cart?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Get.back(),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                Get.back();
-                                cc.clearCart();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.errorColor,
-                              ),
-                              child: const Text(
-                                'Clear',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
+                      AppDialog.confirm(
+                        title: 'Clear Cart?',
+                        message: 'Remove all items from your cart?',
+                        confirmLabel: 'Clear',
+                        confirmColor: AppTheme.errorColor,
+                      ).then((confirmed) {
+                        if (confirmed == true) cc.clearCart();
+                      });
                     },
                     icon: const Icon(
                       Icons.delete_outline_rounded,

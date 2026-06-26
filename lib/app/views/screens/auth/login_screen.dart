@@ -79,15 +79,25 @@ class _LoginScreenState extends State<LoginScreen> {
     // Pure digits 8+ = phone OTP
     if (raw.length >= 8) {
       final phone = '+855${raw.startsWith('0') ? raw.substring(1) : raw}';
-      // Navigate to SMS screen first, then send OTP
-      Get.toNamed(
-        AppRoutes.phoneOTP,
-        arguments: {'phoneNumber': phone, 'isRegistration': false},
-      );
+      // Send OTP first — only navigate on success
       setState(() => _sendingCode = true);
       final error = await auth.sendPhoneOTP(phone);
       if (mounted) setState(() => _sendingCode = false);
-      if (error != null && mounted) AppSnack.error('Error', error);
+      if (error != null && mounted) {
+        AppSnack.error('Error', error);
+        return;
+      }
+      // Auto-verified? (e.g. Firebase test numbers)
+      if (auth.isLoggedIn.value && mounted) {
+        Get.offAllNamed('/main');
+        return;
+      }
+      if (mounted) {
+        Get.toNamed(
+          AppRoutes.phoneOTP,
+          arguments: {'phoneNumber': phone, 'isRegistration': false},
+        );
+      }
     } else {
       final error = await auth.signIn(
         _emailOrPhoneController.text.trim(),

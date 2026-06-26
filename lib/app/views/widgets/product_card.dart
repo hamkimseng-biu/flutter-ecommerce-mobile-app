@@ -88,7 +88,7 @@ class ProductCard extends StatelessWidget {
                       left: 4,
                       child: _b(
                         '${(product.soldCount / 1000).toStringAsFixed(1)}k sold',
-                        isDark ? Colors.white24 : Colors.black54,
+                        Colors.black54,
                       ),
                     ),
                   if (product.freeShipping)
@@ -271,32 +271,47 @@ class ProductCard extends StatelessWidget {
   Widget _ph() => const Center(
     child: Icon(Icons.image_outlined, size: 36, color: Colors.grey),
   );
-  Widget _b(String t, Color c, {IconData? icon, double sz = 9}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-    decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(5)),
-    child: icon != null
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: sz, color: Colors.white),
-              const SizedBox(width: 2),
-              Text(
-                t,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
+
+  /// Returns black or white depending on the perceived brightness of [color].
+  Color _textColorForBg(Color bg) {
+    // Compute relative luminance (sRGB)
+    final r = bg.r, g = bg.g, b = bg.b;
+    final luma = (0.299 * r + 0.587 * g + 0.114 * b) * bg.opacity;
+    return luma > 0.5 ? Colors.black87 : Colors.white;
+  }
+
+  Widget _b(String t, Color c, {IconData? icon, double sz = 9}) {
+    final textColor = _textColorForBg(c);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: c,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: icon != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: sz, color: textColor),
+                const SizedBox(width: 2),
+                Text(
+                  t,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+              ],
+            )
+          : Text(
+              t,
+              style: TextStyle(
+                color: textColor,
+                fontSize: sz,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          )
-        : Text(
-            t,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: sz,
-              fontWeight: FontWeight.bold,
             ),
-          ),
-  );
+    );
+  }
 }

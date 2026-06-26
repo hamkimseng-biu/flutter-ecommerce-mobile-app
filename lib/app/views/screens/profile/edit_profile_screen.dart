@@ -119,8 +119,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'name': _nameCtrl.text.trim(),
       }, SetOptions(merge: true));
       if (mounted) {
-        AppSnack.success('Profile Updated', 'Your profile has been saved.');
         Get.back(result: true);
+        AppSnack.success('Profile Updated', 'Your profile has been saved.');
       }
     } catch (e) {
       if (mounted) {

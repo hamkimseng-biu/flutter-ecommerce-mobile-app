@@ -223,6 +223,3 @@ List<ProductModel> get filteredFeatured { ... }
 
 See `/memories/repo/ux-flow-rules.md` for UX validation checklist.
 
-
-Phone OTP verification shows "No verification in progress" — need to make PhoneOTPScreen wait for sendPhoneOTP to complete before enabling the Verify button, or revert to sending OTP before navigating to the SMS screen.
-

@@ -214,10 +214,13 @@ class _ShopScreenState extends State<ShopScreen> {
                 child: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.black.withValues(alpha: 0.35),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back_rounded),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               flexibleSpace: FlexibleSpaceBar(

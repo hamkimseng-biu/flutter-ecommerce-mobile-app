@@ -34,8 +34,8 @@ class ProductController extends GetxController {
       (products) {
         if (products.isNotEmpty) {
           allProducts.value = products;
-          filteredProducts.value = products;
           _categorizeProducts(products);
+          _applyCategoryFilter();
         }
         _loadSellers();
         isLoading.value = false;
@@ -65,11 +65,17 @@ class ProductController extends GetxController {
     final products = await _firestoreService.getProducts();
     if (products.isNotEmpty) {
       allProducts.value = products;
-      filteredProducts.value = products;
       _categorizeProducts(products);
+      _applyCategoryFilter();
     }
     _loadSellers();
     isLoading.value = false;
+  }
+
+  void _applyCategoryFilter() {
+    final idx = selectedCategoryIndex.value;
+    if (idx > 0 && idx >= categories.length) return;
+    selectCategory(idx);
   }
 
   Future<void> _loadSellers() async {

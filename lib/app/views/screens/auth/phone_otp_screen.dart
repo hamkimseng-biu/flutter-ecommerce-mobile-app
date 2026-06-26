@@ -4,6 +4,30 @@ import '../../../../config/app_theme.dart';
 import '../../../../config/app_snack.dart';
 import '../../../controllers/auth_controller.dart';
 
+/// Formats an E.164 phone number (e.g. +85512345678) for display.
+/// Returns a readable string like "+855 12 345 678" or "+1 555-555-5555".
+String _formatPhoneForDisplay(String e164) {
+  if (e164.isEmpty) return '';
+  // Extract country code and local number
+  final match = RegExp(r'^\+(\d{1,3})(\d+)$').firstMatch(e164);
+  if (match == null) return e164;
+  final cc = match.group(1)!;
+  final local = match.group(2)!;
+  // US/Canada style: +1 555-555-5555
+  if (cc == '1' && local.length == 10) {
+    return '+1 ${local.substring(0, 3)}-${local.substring(3, 6)}-${local.substring(6)}';
+  }
+  // Generic: group in 3s with spaces
+  final buffer = StringBuffer('+$cc');
+  for (int i = 0; i < local.length; i += 3) {
+    buffer.write(' ');
+    buffer.write(
+      local.substring(i, (i + 3 > local.length) ? local.length : i + 3),
+    );
+  }
+  return buffer.toString();
+}
+
 class PhoneOTPScreen extends StatefulWidget {
   final String phoneNumber; // E.164 format
   final bool isRegistration; // true = sign up, false = sign in
@@ -25,6 +49,19 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _verifying = false;
   int _resendCooldown = 0;
+  final AuthController _auth = Get.find<AuthController>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for auto-verification (e.g. Firebase test numbers).
+    // When the user is signed in mid-screen, navigate to main.
+    ever(_auth.isLoggedIn, (bool loggedIn) {
+      if (loggedIn && mounted) {
+        Get.offAllNamed('/main');
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -48,8 +85,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
       return;
     }
     setState(() => _verifying = true);
-    final auth = Get.find<AuthController>();
-    final error = await auth.verifyPhoneOTP(code);
+    final error = await _auth.verifyPhoneOTP(code);
     if (mounted && error != null) {
       setState(() => _verifying = false);
       AppSnack.error('Verification Failed', error);
@@ -58,8 +94,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
 
   Future<void> _resendCode() async {
     setState(() => _resendCooldown = 60);
-    final auth = Get.find<AuthController>();
-    final error = await auth.sendPhoneOTP(widget.phoneNumber);
+    final error = await _auth.sendPhoneOTP(widget.phoneNumber);
     if (error != null) {
       AppSnack.error('Error', error);
     } else {
@@ -76,6 +111,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayPhone = _formatPhoneForDisplay(widget.phoneNumber);
 
     return Scaffold(
       appBar: AppBar(
@@ -115,7 +151,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'A 6-digit code was sent to ${widget.phoneNumber}',
+                'A 6-digit code was sent to $displayPhone',
                 style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
                 textAlign: TextAlign.center,
               ),
@@ -125,7 +161,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(6, (i) {
                   return Container(
-                    width: 48,
+                    width: 52,
                     height: 56,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     child: TextField(
@@ -140,6 +176,7 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
                       ),
                       decoration: InputDecoration(
                         counterText: '',
+                        contentPadding: EdgeInsets.zero,
                         filled: true,
                         fillColor: isDark
                             ? AppTheme.darkSurface2

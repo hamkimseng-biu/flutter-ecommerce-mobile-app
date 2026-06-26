@@ -43,7 +43,7 @@ end
 
 # Direct cold-boot command:
 # QT_QPA_PLATFORM=xcb prime-run emulator -avd Pixel_9 -no-snapshot &
-# QT_QPA_PLATFORM=xcb prime-run emulator --launch Pixel_9 
+# QT_QPA_PLATFORM=xcb prime-run flutter emulator --launch Pixel_9 
 
 # Kill by ADB port (most reliable)
 adb -s emulator-5554 emu kill

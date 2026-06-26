@@ -39,28 +39,23 @@ class TinyChickenApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeCtrl = Get.find<ThemeController>();
-    return Obx(
-      () => GetMaterialApp(
-        title: AppConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeCtrl.isDarkMode.value
-            ? ThemeMode.dark
-            : ThemeMode.light,
-        locale: const Locale('en'),
-        supportedLocales: const [Locale('en'), Locale('km')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        initialRoute: AppRoutes.splash,
-        getPages: AppRoutes.pages,
-        initialBinding: InitialBindings(),
-        defaultTransition: Transition.fadeIn,
-      ),
+    return GetMaterialApp(
+      title: AppConstants.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.light,
+      locale: const Locale('en'),
+      supportedLocales: const [Locale('en'), Locale('km')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      initialRoute: AppRoutes.splash,
+      getPages: AppRoutes.pages,
+      initialBinding: InitialBindings(),
+      defaultTransition: Transition.fadeIn,
     );
   }
 }

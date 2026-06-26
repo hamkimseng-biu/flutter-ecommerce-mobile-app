@@ -5,6 +5,7 @@ import '../../../models/seller_model.dart';
 import '../../../services/firebase_firestore_service.dart';
 import '../../../../../config/app_theme.dart';
 import '../../../../../config/app_snack.dart';
+import '../../../config/app_dialog.dart';
 import '../../../routes/app_routes.dart';
 
 class FollowedShopsScreen extends StatefulWidget {
@@ -60,28 +61,11 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
   }
 
   Future<void> _unfollow(SellerModel shop) async {
-    final confirm = await Get.dialog<bool>(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Unfollow Shop?'),
-        content: Text('Stop following ${shop.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text(
-              'Unfollow',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await AppDialog.confirm(
+      title: 'Unfollow Shop?',
+      message: 'Stop following ${shop.name}?',
+      confirmLabel: 'Unfollow',
+      confirmColor: AppTheme.errorColor,
     );
     if (confirm == true) {
       await _firestore.toggleFollowShop(shop.id);
@@ -188,7 +172,23 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
               ElevatedButton.icon(
                 onPressed: () => Get.offAllNamed(AppRoutes.main),
                 icon: const Icon(Icons.explore_outlined, size: 16),
-                label: const Text('Discover Shops'),
+                label: const Text(
+                  'Discover Shops',
+                  style: TextStyle(fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ],
           ],
