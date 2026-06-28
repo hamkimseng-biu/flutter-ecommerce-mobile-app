@@ -280,7 +280,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   helperText: 'Email cannot be changed',
                   helperStyle: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade500,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
                   ),
                 ),
               ),

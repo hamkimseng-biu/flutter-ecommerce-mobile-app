@@ -60,10 +60,12 @@ class _AddEditShopScreenState extends State<AddEditShopScreen> {
     }
     setState(() => _saving = true);
     try {
-      final data = {
-        'name': _nameCtrl.text.trim(),
+      final shopName = _nameCtrl.text.trim();
+      final shopLogo = _logoUrl;
+      final data = <String, dynamic>{
+        'name': shopName,
         'description': _descCtrl.text.trim(),
-        'logoUrl': _logoUrl,
+        'logoUrl': shopLogo,
         'bannerUrl': _bannerUrl,
         'isOfficial': _isOfficial,
         'isPopular': _isPopular,
@@ -71,9 +73,11 @@ class _AddEditShopScreenState extends State<AddEditShopScreen> {
       };
       if (_isEdit && _docId != null) {
         await _firestore.collection('shops').doc(_docId).update(data);
+        await _syncProductsSellerInfo(_docId!, shopName, shopLogo);
       } else {
         data['createdAt'] = FieldValue.serverTimestamp();
-        await _firestore.collection('shops').add(data);
+        final docRef = await _firestore.collection('shops').add(data);
+        await _syncProductsSellerInfo(docRef.id, shopName, shopLogo);
       }
       if (mounted) {
         setState(() => _saving = false);
@@ -87,33 +91,68 @@ class _AddEditShopScreenState extends State<AddEditShopScreen> {
     }
   }
 
+  /// Batch-update all products with [shopId] to reflect
+  /// the latest seller name and avatar.
+  Future<void> _syncProductsSellerInfo(
+    String shopId,
+    String shopName,
+    String logoUrl,
+  ) async {
+    try {
+      final productsSnap = await _firestore
+          .collection('products')
+          .where('sellerId', isEqualTo: shopId)
+          .get();
+      if (productsSnap.docs.isEmpty) return;
+
+      final batch = _firestore.batch();
+      for (final doc in productsSnap.docs) {
+        batch.update(doc.reference, {
+          'sellerName': shopName,
+          'sellerAvatar': logoUrl.isNotEmpty ? logoUrl : '🏪',
+        });
+      }
+      await batch.commit();
+    } catch (_) {
+      // Non-critical — don't block the save
+    }
+  }
+
   void _addImageUrl(void Function(String) onSet) {
     final urlCtrl = TextEditingController();
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Add Image URL'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: urlCtrl,
-              decoration: InputDecoration(
-                hintText: 'https://picsum.photos/400/400',
-                labelText: 'Image URL',
-                prefixIcon: const Icon(Icons.link),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        content: Builder(
+          builder: (ctx) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: urlCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'https://picsum.photos/400/400',
+                    labelText: 'Image URL',
+                    prefixIcon: const Icon(Icons.link),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Paste any direct image URL (picsum.photos works best).\nURLs like unsplash.com/images/... or imgur.com/...\nshould work too. Pinterest & Instagram are blocked.',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-            ),
-          ],
+                const SizedBox(height: 12),
+                Text(
+                  'Paste any direct image URL (picsum.photos, Pinterest, Unsplash, Imgur all work).',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
@@ -295,22 +334,28 @@ class _AddEditShopScreenState extends State<AddEditShopScreen> {
     );
   }
 
-  Widget _section(String title, String subtitle) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-      ),
-      if (subtitle.isNotEmpty) ...[
-        const SizedBox(height: 2),
+  Widget _section(String title, String subtitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          title,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white54 : Colors.grey.shade500,
+            ),
+          ),
+        ],
       ],
-    ],
-  );
+    );
+  }
 
   Widget _imagePicker({
     required String url,

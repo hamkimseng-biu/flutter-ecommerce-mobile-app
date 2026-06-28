@@ -51,6 +51,7 @@ dependencies:
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
   google_sign_in: ^6.2.1
+  flutter_facebook_auth: ^7.1.1
   firebase_storage: ^12.3.6
   image_picker: ^1.2.2
   firebase_messaging: ^15.2.10
@@ -85,8 +86,7 @@ flutter:
     - assets/images/placeholder.png
     - assets/images/google_logo.png
     - assets/images/icon.png
-    - assets/logo/icons8-google-logo-96.png
-    - assets/logo/Facebook-Logosu-500x281.png
+    - assets/logo/
 
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package

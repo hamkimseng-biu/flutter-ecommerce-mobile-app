@@ -33,6 +33,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   List<String> _detailImages = [];
   List<String> _sizes = ['S', 'M', 'L', 'XL'];
   List<String> _colors = [];
+  List<String> _materials = [];
+  Map<String, List<String>> _customVariants = {};
   bool _isFeatured = false;
   bool _isFlashSale = false;
   bool _showSoldCount = true;
@@ -75,6 +77,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _detailImages = List<String>.from(arg.detailImages);
       _sizes = List<String>.from(arg.sizes);
       _colors = List<String>.from(arg.colors);
+      _materials = List<String>.from(arg.materials);
+      _customVariants = Map<String, List<String>>.from(
+        arg.customVariants.map((k, v) => MapEntry(k, List<String>.from(v))),
+      );
       _isFeatured = arg.isFeatured;
       _isFlashSale = arg.isFlashSale;
       _showSoldCount = arg.showSoldCount;
@@ -119,27 +125,35 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Add Image URL'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: urlCtrl,
-              decoration: InputDecoration(
-                hintText: 'https://picsum.photos/400/400',
-                labelText: 'Image URL',
-                prefixIcon: const Icon(Icons.link),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        content: Builder(
+          builder: (ctx) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: urlCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'https://picsum.photos/400/400',
+                    labelText: 'Image URL',
+                    prefixIcon: const Icon(Icons.link),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Paste any direct image URL (picsum.photos works best).\nURLs like unsplash.com/images/... or imgur.com/...\nshould work too. Pinterest & Instagram are blocked.',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-            ),
-          ],
+                const SizedBox(height: 12),
+                Text(
+                  'Paste any direct image URL (picsum.photos, Pinterest, Unsplash, Imgur all work).',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
@@ -211,6 +225,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         'reviewCount': reviewCount,
         'sizes': _sizes,
         'colors': _colors,
+        'materials': _materials,
+        'customVariants': _customVariants.map((k, v) => MapEntry(k, v)),
         'stock': stock,
         'sellerId': _sellerId.isEmpty
             ? (_existing?.sellerId ?? 'admin')
@@ -280,7 +296,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Add up to 6 images. First image is the main display.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
@@ -430,7 +449,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Extra images shown in description. Not in the main slideshow.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
@@ -666,7 +688,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                                 setState(() {
                                   _sellerId = v;
                                   _sellerName = d['name'] ?? 'Tiny Chicken';
-                                  _sellerAvatar = d['avatar'] ?? '🏪';
+                                  _sellerAvatar =
+                                      d['logoUrl'] ?? d['avatar'] ?? '🏪';
                                 });
                               }
                             },
@@ -699,6 +722,15 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                       ),
                       const SizedBox(height: 14),
                       _buildChipSection(
+                        'Materials',
+                        _materials,
+                        'material',
+                        Icons.texture_outlined,
+                        fillColor,
+                        isDark,
+                      ),
+                      const SizedBox(height: 14),
+                      _buildChipSection(
                         'Colors',
                         _colors,
                         'color',
@@ -706,6 +738,25 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                         fillColor,
                         isDark,
                       ),
+                      // ── Dynamic custom variants ──
+                      ..._customVariants.entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: _buildChipSection(
+                            entry.key,
+                            entry.value,
+                            entry.key,
+                            Icons.tune_rounded,
+                            fillColor,
+                            isDark,
+                            onDeleteSection: () => setState(
+                              () => _customVariants.remove(entry.key),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 14),
+                      _buildAddVariantType(fillColor, isDark),
                     ],
                   ),
 
@@ -889,21 +940,37 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     String type,
     IconData icon,
     Color fillColor,
-    bool isDark,
-  ) {
+    bool isDark, {
+    VoidCallback? onDeleteSection,
+  }) {
     final chipTextColor = isDark
         ? AppTheme.darkTextPrimary
         : AppTheme.lightTextPrimary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: chipTextColor,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: chipTextColor,
+              ),
+            ),
+            if (onDeleteSection != null) ...[
+              const Spacer(),
+              GestureDetector(
+                onTap: onDeleteSection,
+                child: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: AppTheme.errorColor,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -1025,16 +1092,28 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Add ${type == 'size' ? 'Size' : 'Color'}'),
+        title: Text(
+          'Add ${type == 'size'
+              ? 'Size'
+              : type == 'color'
+              ? 'Color'
+              : 'Material'}',
+        ),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: type == 'size' ? 'e.g. XL' : 'e.g. Red',
+            hintText: type == 'size'
+                ? 'e.g. XL'
+                : type == 'color'
+                ? 'e.g. Red'
+                : 'e.g. Cotton',
             prefixIcon: Icon(
               type == 'size'
                   ? Icons.straighten_outlined
-                  : Icons.palette_outlined,
+                  : type == 'color'
+                  ? Icons.palette_outlined
+                  : Icons.texture_outlined,
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -1048,8 +1127,13 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 setState(() {
                   if (type == 'size') {
                     _sizes.add(val);
-                  } else {
+                  } else if (type == 'color') {
                     _colors.add(val);
+                  } else if (type == 'material') {
+                    _materials.add(val);
+                  } else {
+                    _customVariants[type] ??= [];
+                    _customVariants[type]!.add(val);
                   }
                 });
               }
@@ -1059,6 +1143,64 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               backgroundColor: AppTheme.primaryColor,
             ),
             child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddVariantType(Color fillColor, bool isDark) {
+    return ActionChip(
+      avatar: const Icon(
+        Icons.add_circle_outline,
+        size: 16,
+        color: AppTheme.primaryColor,
+      ),
+      label: const Text(
+        'Add Custom Variant',
+        style: TextStyle(
+          fontSize: 12,
+          color: AppTheme.primaryColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onPressed: () => _showAddVariantTypeDialog(),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: fillColor,
+      side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+    );
+  }
+
+  void _showAddVariantTypeDialog() {
+    final nameCtrl = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('New Variant Type'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'e.g. Style, Weight, Fit',
+            labelText: 'Variant Name',
+            prefixIcon: const Icon(Icons.tune_rounded),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              if (name.isNotEmpty && !_customVariants.containsKey(name)) {
+                setState(() => _customVariants[name] = []);
+              }
+              Get.back();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text('Create'),
           ),
         ],
       ),

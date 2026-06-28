@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -18,12 +19,15 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // App Check — debug provider for development,
-  // SafetyNet/Play Integrity for release builds
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-    appleProvider: AppleProvider.debug,
-  );
+  // App Check — only enabled in release builds.
+  // The debug provider hits rate limits ("Too many attempts")
+  // during development and blocks auth operations.
+  if (!kDebugMode) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+  }
 
   // Init FCM (push notifications) — non-blocking
   FcmService().initialize();

@@ -75,4 +75,14 @@ class WishlistController extends GetxController {
       AppSnack.success('Added!', '${product.name} added to wishlist.');
     }
   }
+
+  Future<void> clearAll() async {
+    try {
+      await _firestoreService.clearAllWishlist();
+      wishlistItems.clear();
+      AppSnack.success('Cleared', 'All wishlist items removed.');
+    } catch (_) {
+      AppSnack.error('Error', 'Could not clear wishlist.');
+    }
+  }
 }

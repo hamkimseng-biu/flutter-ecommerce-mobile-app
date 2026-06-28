@@ -6,6 +6,16 @@ import '../models/seller_model.dart';
 import '../services/mock_data_service.dart';
 import '../services/firebase_firestore_service.dart';
 
+enum SortOption {
+  featured,
+  priceAsc,
+  priceDesc,
+  ratingDesc,
+  ratingAsc,
+  newestFirst,
+  oldestFirst,
+}
+
 class ProductController extends GetxController {
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
 
@@ -21,9 +31,77 @@ class ProductController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString searchQuery = ''.obs;
 
+  // Sorting
+  final Rx<SortOption> sortOption = SortOption.featured.obs;
+  final RxBool isSorting = false.obs;
+
+  /// Returns the display direction arrow for the current sort.
+  String get sortPriceArrow =>
+      sortOption.value == SortOption.priceAsc ? '↑' : '↓';
+  String get sortRatingArrow =>
+      sortOption.value == SortOption.ratingAsc ? '↑' : '↓';
+  String get sortNewestArrow =>
+      sortOption.value == SortOption.oldestFirst ? '↑' : '↓';
+
+  void setSort(SortOption opt) {
+    sortOption.value = opt;
+    _triggerSortRefresh();
+  }
+
+  void _triggerSortRefresh() {
+    isSorting.value = true;
+    Future.delayed(const Duration(milliseconds: 300), () {
+      isSorting.value = false;
+    });
+  }
+
+  List<ProductModel> _applySort(List<ProductModel> list) {
+    switch (sortOption.value) {
+      case SortOption.priceAsc:
+        list.sort((a, b) => a.effectivePrice.compareTo(b.effectivePrice));
+      case SortOption.priceDesc:
+        list.sort((a, b) => b.effectivePrice.compareTo(a.effectivePrice));
+      case SortOption.ratingDesc:
+        list.sort((a, b) => b.rating.compareTo(a.rating));
+      case SortOption.ratingAsc:
+        list.sort((a, b) => a.rating.compareTo(b.rating));
+      case SortOption.newestFirst:
+        list = list.reversed.toList();
+      case SortOption.oldestFirst:
+        // keep original order
+        break;
+      case SortOption.featured:
+        break;
+    }
+    return list;
+  }
+
+  /// Returns related products (same category if possible, else popular).
+  List<ProductModel> getRelatedProducts(String productId, {String? category}) {
+    final cat = (category ?? '').toLowerCase();
+
+    List<ProductModel> related;
+    if (cat.isNotEmpty) {
+      related = allProducts
+          .where((p) => p.id != productId && p.category.toLowerCase() == cat)
+          .toList();
+    } else {
+      related = [];
+    }
+
+    // Fallback: use featured or top-selling products
+    if (related.length < 3) {
+      related = allProducts.where((p) => p.id != productId).toList();
+    }
+
+    related.shuffle();
+    return related.take(6).toList();
+  }
+
   @override
   void onInit() {
     super.onInit();
+    _loadSellers();
     _loadFromStream();
   }
 
@@ -37,7 +115,6 @@ class ProductController extends GetxController {
           _categorizeProducts(products);
           _applyCategoryFilter();
         }
-        _loadSellers();
         isLoading.value = false;
       },
       onError: (_) {
@@ -78,27 +155,29 @@ class ProductController extends GetxController {
     selectCategory(idx);
   }
 
-  Future<void> _loadSellers() async {
-    try {
-      final snap = await FirebaseFirestore.instance.collection('shops').get();
-      if (snap.docs.isNotEmpty) {
-        sellers.value = snap.docs.map((doc) {
-          final d = doc.data();
-          return SellerModel(
-            id: doc.id,
-            name: d['name'] ?? 'Shop',
-            avatar: d['avatar'] ?? '🏪',
-            logoUrl: d['logoUrl'] ?? '',
-            banner: d['bannerUrl'] ?? '',
-            description: d['description'] ?? '',
-            isOfficial: d['isOfficial'] ?? false,
-            isPopular: d['isPopular'] ?? false,
-          );
-        }).toList();
+  void _loadSellers() {
+    FirebaseFirestore.instance.collection('shops').snapshots().listen((snap) {
+      if (snap.docs.isEmpty) {
+        sellers.value = MockDataService.getSellers();
         return;
       }
-    } catch (_) {}
-    sellers.value = MockDataService.getSellers();
+      sellers.value = snap.docs.map((doc) {
+        final d = doc.data();
+        return SellerModel(
+          id: doc.id,
+          name: d['name'] ?? 'Shop',
+          avatar: d['logoUrl'] ?? d['avatar'] ?? '🏪',
+          logoUrl: d['logoUrl'] ?? '',
+          banner: d['bannerUrl'] ?? '',
+          description: d['description'] ?? '',
+          rating: (d['rating'] ?? 0.0).toDouble(),
+          productCount: 0,
+          followerCount: (d['followerCount'] ?? 0) as int,
+          isOfficial: d['isOfficial'] ?? false,
+          isPopular: d['isPopular'] ?? false,
+        );
+      }).toList();
+    });
   }
 
   /// Only sellers marked as popular by admin
@@ -141,27 +220,42 @@ class ProductController extends GetxController {
 
   /// Flash sale products filtered by selected category
   List<ProductModel> get filteredFlashSale {
-    if (selectedCategoryIndex.value == 0) return flashSaleProducts;
+    if (selectedCategoryIndex.value == 0)
+      return _applySort(flashSaleProducts.toList());
     final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
-    return flashSaleProducts
-        .where((p) => p.category.toLowerCase() == cat)
-        .toList();
+    return _applySort(
+      flashSaleProducts.where((p) => p.category.toLowerCase() == cat).toList(),
+    );
   }
 
   /// Featured products filtered by selected category
   List<ProductModel> get filteredFeatured {
-    if (selectedCategoryIndex.value == 0) return featuredProducts;
+    if (selectedCategoryIndex.value == 0)
+      return _applySort(featuredProducts.toList());
     final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
-    return featuredProducts
-        .where((p) => p.category.toLowerCase() == cat)
-        .toList();
+    return _applySort(
+      featuredProducts.where((p) => p.category.toLowerCase() == cat).toList(),
+    );
   }
 
   /// New arrivals filtered by selected category
   List<ProductModel> get filteredNewArrivals {
-    if (selectedCategoryIndex.value == 0) return newArrivals;
+    if (selectedCategoryIndex.value == 0)
+      return _applySort(newArrivals.toList());
     final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
-    return newArrivals.where((p) => p.category.toLowerCase() == cat).toList();
+    return _applySort(
+      newArrivals.where((p) => p.category.toLowerCase() == cat).toList(),
+    );
+  }
+
+  /// Trending filtered by selected category
+  List<ProductModel> get filteredTrending {
+    if (selectedCategoryIndex.value == 0)
+      return _applySort(trendingProducts.toList());
+    final cat = categories[selectedCategoryIndex.value].name.toLowerCase();
+    return _applySort(
+      trendingProducts.where((p) => p.category.toLowerCase() == cat).toList(),
+    );
   }
 
   void searchProducts(String query) {
@@ -194,4 +288,9 @@ class ProductController extends GetxController {
       return null;
     }
   }
+
+  /// Reactive product count for a seller.
+  /// Use in Obx to auto-update when products change.
+  int getSellerProductCount(String sellerId) =>
+      allProducts.where((p) => p.sellerId == sellerId).length;
 }

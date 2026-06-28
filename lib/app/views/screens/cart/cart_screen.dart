@@ -81,7 +81,10 @@ class CartScreen extends StatelessWidget {
                   const Spacer(),
                   Text(
                     '${cc.selectedCount} selected',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -271,7 +274,9 @@ class CartScreen extends StatelessWidget {
                                               : 'Size: ${item.selectedSize}',
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: Colors.grey.shade500,
+                                            color: isDark
+                                                ? Colors.white54
+                                                : Colors.grey.shade500,
                                           ),
                                         ),
                                         const SizedBox(height: 6),

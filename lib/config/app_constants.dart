@@ -4,7 +4,7 @@ class AppConstants {
   static const String baseUrl = 'https://api.tinychicken.com/v1';
 
   // Asset paths
-  static const String logoPath = 'assets/images/logo.png';
+  static const String logoPath = 'assets/logo/Chicken Logo.png';
   static const String placeholderPath = 'assets/images/placeholder.png';
 
   // Animation durations

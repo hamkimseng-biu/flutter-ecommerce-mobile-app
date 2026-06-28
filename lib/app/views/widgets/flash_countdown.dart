@@ -52,8 +52,11 @@ class _FlashCountdownState extends State<FlashCountdown> {
     final h = _remaining.inHours;
     final m = _remaining.inMinutes.remainder(60);
     final s = _remaining.inSeconds.remainder(60);
-    final boxColor = widget.boxColor ?? Colors.black87;
-    final textColor = widget.textColor ?? Colors.white;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final boxColor =
+        widget.boxColor ?? (isDark ? Colors.white24 : Colors.black87);
+    final textColor =
+        widget.textColor ?? (isDark ? Colors.white : Colors.white);
 
     return Row(
       mainAxisSize: MainAxisSize.min,

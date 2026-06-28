@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../controllers/wishlist_controller.dart';
 import '../../../controllers/cart_controller.dart';
 import '../../../../../config/app_theme.dart';
+import '../../../config/app_dialog.dart';
 import '../../widgets/product_card.dart';
 import '../../../routes/app_routes.dart';
 
@@ -11,6 +12,7 @@ class WishlistScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final wc = Get.find<WishlistController>();
     final cc = Get.find<CartController>();
     Future.microtask(() => wc.loadWishlist());
@@ -22,14 +24,20 @@ class WishlistScreen extends StatelessWidget {
         actions: [
           Obx(
             () => wc.wishlistItems.isNotEmpty
-                ? Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.share_outlined, size: 22),
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 4),
-                    ],
+                ? IconButton(
+                    icon: const Icon(Icons.delete_sweep_outlined, size: 22),
+                    tooltip: 'Clear All',
+                    onPressed: () {
+                      AppDialog.confirm(
+                        title: 'Clear Wishlist?',
+                        message:
+                            'Remove all ${wc.wishlistItems.length} items from your wishlist?',
+                        confirmLabel: 'Clear All',
+                        confirmColor: AppTheme.errorColor,
+                      ).then((confirmed) {
+                        if (confirmed == true) wc.clearAll();
+                      });
+                    },
                   )
                 : const SizedBox(),
           ),
@@ -102,7 +110,10 @@ class WishlistScreen extends StatelessWidget {
                   const Spacer(),
                   Text(
                     'Tap to view & pick options',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white38 : Colors.grey.shade400,
+                    ),
                   ),
                 ],
               ),

@@ -441,7 +441,7 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
                         'Your card info is encrypted and secure',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: isDark ? Colors.white54 : Colors.grey.shade500,
                         ),
                       ),
                     ],
@@ -511,20 +511,32 @@ class _AddEditCardScreenState extends State<AddEditCardScreen> {
     IconData icon,
     Color fill, {
     Widget? suffix,
-  }) => InputDecoration(
-    hintText: hint,
-    hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
-    prefixIcon: Icon(icon, size: 20, color: Colors.grey.shade500),
-    suffixIcon: suffix,
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.grey.shade200),
-    ),
-    filled: true,
-    fillColor: fill,
-    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-    counterText: '',
-    isDense: true,
-  );
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14,
+        color: isDark ? Colors.white38 : Colors.grey.shade400,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 20,
+        color: isDark ? Colors.white54 : Colors.grey.shade500,
+      ),
+      suffixIcon: suffix,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
+      ),
+      filled: true,
+      fillColor: fill,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+      counterText: '',
+      isDense: true,
+    );
+  }
 }

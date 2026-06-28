@@ -9,6 +9,7 @@ import '../../../routes/app_routes.dart';
 import '../../../services/firebase_firestore_service.dart';
 import '../../../services/fcm_service.dart';
 import '../../../controllers/theme_controller.dart';
+import '../../../controllers/currency_controller.dart';
 import '../../../controllers/product_controller.dart';
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -29,6 +30,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     'Shipping',
     'On Delivery',
     'Delivered',
+    'Return Requested',
     'Cancelled',
     'To Review',
   ];
@@ -111,7 +113,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   List<Map<String, dynamic>> _filterList(List<Map<String, dynamic>> list) {
     if (_activeTab == 0) return list;
-    if (_activeTab == 6)
+    if (_activeTab == 7)
       return list.where((o) => o['status'] == 'Delivered').toList();
     final status = _tabs[_activeTab];
     return list.where((o) => o['status'] == status).toList();
@@ -127,6 +129,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         return AppTheme.primaryColor;
       case 'Processing':
         return Colors.amber;
+      case 'Return Requested':
+        return Colors.orange;
       case 'Cancelled':
         return AppTheme.errorColor;
       default:
@@ -218,7 +222,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: const Text('My Orders'),
         actions: [
-          if (_activeTab == 4 || _activeTab == 5)
+          if (_activeTab == 4 || _activeTab == 5 || _activeTab == 6)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
               tooltip: 'Clear ${_tabs[_activeTab]}',
@@ -266,7 +270,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                   : FontWeight.w500,
                               color: active
                                   ? AppTheme.primaryColor
-                                  : Colors.grey.shade500,
+                                  : (isDark
+                                        ? Colors.white54
+                                        : Colors.grey.shade500),
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -401,6 +407,83 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
   }
 
+  void _requestReturn(Map<String, dynamic> o) {
+    final fid = o['firestoreId'] as String?;
+    if (fid == null) return;
+    final reasonCtrl = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Request Return'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Why are you returning this order?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              decoration: InputDecoration(
+                hintText: 'e.g. Wrong size, defective item...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              Get.back();
+              _firestoreService
+                  .requestReturn(
+                    fid,
+                    reasonCtrl.text.trim().isEmpty
+                        ? 'No reason provided'
+                        : reasonCtrl.text.trim(),
+                  )
+                  .then((_) {
+                    AppSnack.success(
+                      'Return Requested',
+                      'Your return request has been submitted.',
+                    );
+                  })
+                  .catchError((_) {
+                    AppSnack.error('Error', 'Could not submit return request.');
+                  });
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _cancelReturn(Map<String, dynamic> o) {
+    final fid = o['firestoreId'] as String?;
+    if (fid == null) return;
+    AppDialog.confirm(
+      title: 'Cancel Return',
+      message:
+          'Cancel this return request? The order will go back to Delivered status.',
+      confirmLabel: 'Yes, Cancel',
+      confirmColor: Colors.orange,
+    ).then((confirmed) {
+      if (confirmed != true) return;
+      _firestoreService
+          .cancelReturnRequest(fid)
+          .then((_) {
+            AppSnack.success('Cancelled', 'Return request cancelled.');
+          })
+          .catchError((_) {
+            AppSnack.error('Error', 'Could not cancel return request.');
+          });
+    });
+  }
+
   void _confirmArrival(Map<String, dynamic> o) {
     final fid = o['firestoreId'] as String?;
     if (fid == null) return;
@@ -442,6 +525,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildEmptyState(String tab) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     String icon;
     String title;
     String subtitle;
@@ -466,6 +550,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
         title = 'No delivered orders';
         subtitle = 'Completed orders will show up here.';
         break;
+      case 'Return Requested':
+        icon = '↩️';
+        title = 'No return requests';
+        subtitle = 'Return requests will appear here.';
+        break;
       case 'Cancelled':
         icon = '🗑️';
         title = 'No cancelled orders';
@@ -489,7 +578,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white54 : Colors.grey.shade500,
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
@@ -658,7 +750,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       '${o['date']}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: isDark ? Colors.white54 : Colors.grey.shade500,
                       ),
                     ),
                   ],
@@ -678,6 +770,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
+                  // Cancel return request
+                  if (status == 'Return Requested')
+                    TextButton.icon(
+                      onPressed: () => _cancelReturn(o),
+                      icon: const Icon(
+                        Icons.undo_rounded,
+                        size: 16,
+                        color: Colors.orange,
+                      ),
+                      label: const Text(
+                        'Cancel Return',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ),
                   // Cancel button for Processing orders
                   if (status == 'Processing')
                     TextButton.icon(
@@ -707,6 +813,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       label: const Text(
                         'Confirm Arrival',
                         style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  // Return Request for Delivered orders
+                  if (status == 'Delivered')
+                    TextButton.icon(
+                      onPressed: () => _requestReturn(o),
+                      icon: const Icon(
+                        Icons.assignment_return_outlined,
+                        size: 16,
+                        color: Colors.orange,
+                      ),
+                      label: const Text(
+                        'Return',
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
                       ),
                     ),
                   // Review buttons for Delivered orders — navigate to product
@@ -1150,7 +1270,10 @@ class _AddressesScreenState extends State<AddressesScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'Add an address for faster checkout',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -1281,7 +1404,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                                   _formatPhone(a['phone'] ?? ''),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey.shade500,
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.grey.shade500,
                                   ),
                                 ),
                               ],
@@ -1592,6 +1717,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   Widget _tabBtn(String label, int tab) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final active = _paymentTab == tab;
     return Expanded(
       child: GestureDetector(
@@ -1608,7 +1734,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  color: active ? AppTheme.primaryColor : Colors.grey.shade500,
+                  color: active
+                      ? AppTheme.primaryColor
+                      : (isDark ? Colors.white54 : Colors.grey.shade500),
                 ),
               ),
               const SizedBox(height: 6),
@@ -2052,8 +2180,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _firestore = FirebaseFirestore.instance;
   String _language = 'English';
-  String _currency = 'USD (\$)';
   String _country = 'Cambodia';
+
+  String get _currency => Get.find<CurrencyController>().currency.value == 'KHR'
+      ? 'KHR (៛)'
+      : Get.find<CurrencyController>().currency.value == 'EUR'
+      ? 'EUR (€)'
+      : 'USD (\$)';
 
   @override
   void initState() {
@@ -2067,19 +2200,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (doc.exists) {
         final data = doc.data()!;
         setState(() {
-          _currency = data['currency'] ?? 'USD (\$)';
           _language = data['language'] ?? 'English';
           _country = data['country'] ?? 'Cambodia';
         });
       }
     } catch (_) {}
-  }
-
-  Future<void> _saveCurrency(String v) async {
-    await _firestore.collection('settings').doc('app').set({
-      'currency': v,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
   }
 
   void _selectOption(
@@ -2203,8 +2328,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _currency,
               ['USD (\$)', 'KHR (៛)', 'EUR (€)'],
               (v) {
-                setState(() => _currency = v);
-                _saveCurrency(v);
+                Get.find<CurrencyController>().setCurrency(v);
+                setState(() {}); // refresh the getter
               },
             ),
             subColor,

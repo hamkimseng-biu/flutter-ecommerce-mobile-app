@@ -6,14 +6,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../models/product_model.dart';
 import '../../../controllers/product_controller.dart';
 import '../../../controllers/cart_controller.dart';
 import '../../../controllers/home_controller.dart';
 import '../../../services/firebase_firestore_service.dart';
+import '../../../services/fcm_service.dart';
 import '../../../../../config/app_theme.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/flash_countdown.dart';
+import '../../widgets/search_bar_widget.dart';
 import '../../../routes/app_routes.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -48,7 +51,7 @@ class HomeScreen extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.asset(
-                  'assets/images/icon.png',
+                  'assets/logo/Chicken Logo.png',
                   width: 30,
                   height: 30,
                   fit: BoxFit.cover,
@@ -68,6 +71,52 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => Get.toNamed(AppRoutes.search),
             splashRadius: 20,
             visualDensity: VisualDensity.compact,
+          ),
+          // Notification bell
+          StreamBuilder<int>(
+            stream: FcmService().getUnreadCountStream(),
+            initialData: 0,
+            builder: (_, snap) {
+              final count = snap.data ?? 0;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      count > 0
+                          ? Icons.notifications_rounded
+                          : Icons.notifications_outlined,
+                      size: 22,
+                    ),
+                    onPressed: () => Get.toNamed(AppRoutes.notifications),
+                    splashRadius: 20,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(minWidth: 16),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.errorColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           Obx(
             () => Stack(
@@ -108,47 +157,18 @@ class HomeScreen extends StatelessWidget {
       body: Column(
         children: [
           // ═══ PINNED: Search bar ═══
-          GestureDetector(
-            onTap: () => Get.toNamed(AppRoutes.search),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 4, 12, 2),
-              height: 38,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.darkInputFill
-                    : AppTheme.primaryColor.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 12),
-                  const Icon(
-                    Icons.search_rounded,
-                    color: AppTheme.primaryColor,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Search in Tiny Chicken',
-                    style: TextStyle(
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : const Color(0xFFAAAAAA),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+            child: SearchBarWidget(
+              enabled: false,
+              onTap: () => Get.toNamed(AppRoutes.search),
             ),
           ),
 
           // ═══ PINNED: Category chips ═══
           Obx(() {
-            if (pc.categories.isEmpty) return const SizedBox(height: 8);
             final sel = pc.selectedCategoryIndex.value;
+            if (pc.categories.isEmpty) return const SizedBox(height: 8);
             return SizedBox(
               height: 42,
               child: ListView.builder(
@@ -157,7 +177,7 @@ class HomeScreen extends StatelessWidget {
                 itemCount: pc.categories.length,
                 itemBuilder: (ctx, i) {
                   final cat = pc.categories[i];
-                  final active = sel == i;
+                  final activeCat = sel == i;
                   return GestureDetector(
                     onTap: () => pc.selectCategory(i),
                     child: Container(
@@ -170,13 +190,13 @@ class HomeScreen extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: active
+                        color: activeCat
                             ? AppTheme.primaryColor.withValues(alpha: 0.1)
                             : (isDark
                                   ? AppTheme.darkSurface2
                                   : const Color(0xFFF5F6FA)),
                         borderRadius: BorderRadius.circular(20),
-                        border: active
+                        border: activeCat
                             ? Border.all(
                                 color: AppTheme.primaryColor,
                                 width: 1.5,
@@ -188,7 +208,7 @@ class HomeScreen extends StatelessWidget {
                         children: [
                           Text(
                             cat.icon,
-                            style: TextStyle(fontSize: active ? 17 : 15),
+                            style: TextStyle(fontSize: activeCat ? 17 : 15),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
@@ -198,10 +218,10 @@ class HomeScreen extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: active
+                                fontWeight: activeCat
                                     ? FontWeight.w600
                                     : FontWeight.w400,
-                                color: active
+                                color: activeCat
                                     ? AppTheme.primaryColor
                                     : (isDark
                                           ? AppTheme.darkTextSecondary
@@ -349,7 +369,9 @@ class HomeScreen extends StatelessWidget {
 
                     // ── Popular Shops ──
                     Obx(() {
-                      final sellers = pc.popularSellers;
+                      var sellers = pc.popularSellers;
+                      if (sellers.isEmpty)
+                        sellers = pc.sellers.take(6).toList();
                       if (sellers.isEmpty) return const SizedBox.shrink();
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,7 +547,7 @@ class HomeScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              _shimmerGrid(),
+                              _shimmerGrid(isDark),
                             ],
                           ),
                         );
@@ -567,13 +589,16 @@ class HomeScreen extends StatelessWidget {
                                     mainAxisSpacing: 8,
                                   ),
                               itemCount: items.length,
-                              itemBuilder: (ctx, i) => ProductCard(
-                                product: items[i],
-                                onTap: () => Get.toNamed(
-                                  AppRoutes.productDetail,
-                                  arguments: items[i],
+                              itemBuilder: (ctx, i) => _StaggeredItem(
+                                index: i,
+                                child: ProductCard(
+                                  product: items[i],
+                                  onTap: () => Get.toNamed(
+                                    AppRoutes.productDetail,
+                                    arguments: items[i],
+                                  ),
+                                  onAddToCart: () => cc.addToCart(items[i]),
                                 ),
-                                onAddToCart: () => cc.addToCart(items[i]),
                               ),
                             ),
                           ],
@@ -604,20 +629,24 @@ class HomeScreen extends StatelessWidget {
     return FlashCountdown(endTime: endTime);
   }
 
-  Widget _shimmerGrid() => GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      childAspectRatio: 0.68,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-    ),
-    itemCount: 6,
-    itemBuilder: (_, __) => Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
+  Widget _shimmerGrid(bool isDark) => Shimmer.fromColors(
+    baseColor: isDark ? Colors.white10 : Colors.grey.shade300,
+    highlightColor: isDark ? Colors.white24 : Colors.grey.shade100,
+    child: GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.68,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     ),
   );
@@ -934,6 +963,57 @@ class _PromoSlide {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Staggered fade-in + slide-up animation for grid items.
+class _StaggeredItem extends StatefulWidget {
+  final int index;
+  final Widget child;
+  const _StaggeredItem({required this.index, required this.child});
+
+  @override
+  State<_StaggeredItem> createState() => _StaggeredItemState();
+}
+
+class _StaggeredItemState extends State<_StaggeredItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    final delay = (widget.index * 60).clamp(0, 400).toDouble();
+    final curved = CurvedAnimation(
+      parent: _ctrl,
+      curve: Interval(delay / 500, 1.0, curve: Curves.easeOutCubic),
+    );
+    _opacity = Tween<double>(begin: 0, end: 1).animate(curved);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(curved);
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(position: _slide, child: widget.child),
     );
   }
 }

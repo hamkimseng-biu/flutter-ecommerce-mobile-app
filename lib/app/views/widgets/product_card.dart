@@ -108,28 +108,37 @@ class ProductCard extends StatelessWidget {
                       final fav = wc.isInWishlist(product.id);
                       return GestureDetector(
                         onTap: () => wc.toggleWishlist(product),
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white12
-                                : Colors.white.withValues(alpha: 0.85),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(
-                                  alpha: isDark ? 0.3 : 0.06,
-                                ),
-                                blurRadius: 3,
+                        child: TweenAnimationBuilder<double>(
+                          key: ValueKey(fav),
+                          tween: Tween(begin: 0.6, end: 1.0),
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.elasticOut,
+                          builder: (_, s, __) => Transform.scale(
+                            scale: s,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white12
+                                    : Colors.white.withValues(alpha: 0.85),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: isDark ? 0.3 : 0.06,
+                                    ),
+                                    blurRadius: 3,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            fav ? Icons.favorite : Icons.favorite_border,
-                            color: fav
-                                ? AppTheme.errorColor
-                                : (isDark ? Colors.white54 : Colors.grey),
-                            size: 16,
+                              child: Icon(
+                                fav ? Icons.favorite : Icons.favorite_border,
+                                color: fav
+                                    ? AppTheme.errorColor
+                                    : (isDark ? Colors.white54 : Colors.grey),
+                                size: 16,
+                              ),
+                            ),
                           ),
                         ),
                       );

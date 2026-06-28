@@ -112,6 +112,30 @@ class AuthController extends GetxController {
     }
   }
 
+  // Sign in with Facebook
+  Future<String?> signInWithFacebook() async {
+    try {
+      isLoading.value = true;
+      final result = await _authService.signInWithFacebook();
+      if (result == null) {
+        isLoading.value = false;
+        return null; // User cancelled
+      }
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (Get.isDialogOpen ?? false) Get.back();
+      Get.offAllNamed('/main');
+      return null;
+    } catch (e) {
+      return e.toString();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // Phone auth state
   PhoneAuthResult? _phoneConfirmation;
 
@@ -147,6 +171,13 @@ class AuthController extends GetxController {
       isLoading.value = true;
       await _phoneConfirmation!.signIn(smsCode);
       _phoneConfirmation = null;
+      // Show loading screen before navigating to main
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (Get.isDialogOpen ?? false) Get.back();
       Get.offAllNamed('/main');
       return null;
     } catch (e) {

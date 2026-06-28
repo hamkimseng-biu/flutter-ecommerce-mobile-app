@@ -152,7 +152,10 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
               const SizedBox(height: 8),
               Text(
                 'A 6-digit code was sent to $displayPhone',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white54 : Colors.grey.shade500,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -239,7 +242,9 @@ class _PhoneOTPScreenState extends State<PhoneOTPScreen> {
                 children: [
                   Text(
                     "Didn't receive a code?",
-                    style: TextStyle(color: Colors.grey.shade500),
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : Colors.grey.shade500,
+                    ),
                   ),
                   TextButton(
                     onPressed: _resendCooldown > 0 ? null : _resendCode,

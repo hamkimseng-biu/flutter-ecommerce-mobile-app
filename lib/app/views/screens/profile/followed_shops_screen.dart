@@ -165,7 +165,10 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
               _searchCtl.text.isNotEmpty
                   ? 'Try a different search.'
                   : 'Follow shops to see them here.',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white54 : Colors.grey.shade500,
+              ),
             ),
             if (_searchCtl.text.isEmpty) ...[
               const SizedBox(height: 20),

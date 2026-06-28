@@ -113,6 +113,34 @@ class FirebaseFirestoreService {
   }
 
   // ═══════════════════════════════════════════
+  // USERS
+  // ═══════════════════════════════════════════
+
+  /// Searches users by name or email. Returns list of {uid, name, email}.
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return [];
+
+    final snapshot = await _firestore.collection('users').orderBy('name').get();
+
+    return snapshot.docs
+        .map(
+          (doc) => {
+            'uid': doc.id,
+            'name': doc.data()['name'] as String? ?? 'Unknown',
+            'email': doc.data()['email'] as String? ?? '',
+          },
+        )
+        .where((u) {
+          final name = (u['name'] as String).toLowerCase();
+          final email = (u['email'] as String).toLowerCase();
+          return name.contains(q) || email.contains(q);
+        })
+        .take(15)
+        .toList();
+  }
+
+  // ═══════════════════════════════════════════
   // CATEGORY MANAGEMENT (Admin)
   // ═══════════════════════════════════════════
 
@@ -272,6 +300,17 @@ class FirebaseFirestoreService {
     await _wishlistRef.doc(productId).delete();
   }
 
+  // Clear all wishlist
+  Future<void> clearAllWishlist() async {
+    if (_uid.isEmpty) return;
+    final batch = _firestore.batch();
+    final snapshot = await _wishlistRef.get();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   // Check if product is in wishlist
   Future<bool> isInWishlist(String productId) async {
     if (_uid.isEmpty) return false;
@@ -296,9 +335,10 @@ class FirebaseFirestoreService {
     required double total,
     required String promoCode,
     required String paymentMethod,
+    String? guestName,
+    String? guestEmail,
   }) async {
-    if (_uid.isEmpty) throw Exception('User not logged in');
-    final docRef = await _ordersRef.add({
+    final data = <String, dynamic>{
       'items': items,
       'subtotal': subtotal,
       'tax': tax,
@@ -309,9 +349,19 @@ class FirebaseFirestoreService {
       'paymentMethod': paymentMethod,
       'status': 'Processing',
       'createdAt': FieldValue.serverTimestamp(),
-      'userId': _uid,
-    });
-    return docRef.id;
+    };
+
+    if (_uid.isNotEmpty) {
+      data['userId'] = _uid;
+      final docRef = await _ordersRef.add(data);
+      return docRef.id;
+    } else {
+      // Guest order — store in guest_orders collection
+      if (guestName != null) data['guestName'] = guestName;
+      if (guestEmail != null) data['guestEmail'] = guestEmail;
+      final docRef = await _firestore.collection('guest_orders').add(data);
+      return docRef.id;
+    }
   }
 
   // Get all user orders
@@ -640,6 +690,26 @@ class FirebaseFirestoreService {
     await _ordersRef.doc(orderId).delete();
   }
 
+  /// Request a return/refund for a delivered order
+  Future<void> requestReturn(String orderId, String reason) async {
+    if (_uid.isEmpty) return;
+    await _ordersRef.doc(orderId).update({
+      'status': 'Return Requested',
+      'returnReason': reason,
+      'returnRequestedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Cancel a pending return request
+  Future<void> cancelReturnRequest(String orderId) async {
+    if (_uid.isEmpty) return;
+    await _ordersRef.doc(orderId).update({
+      'status': 'Delivered',
+      'returnReason': FieldValue.delete(),
+      'returnRequestedAt': FieldValue.delete(),
+    });
+  }
+
   // ═══════════════════════════════════════════
   // ADMIN — orders across all users
   // ═══════════════════════════════════════════
@@ -761,9 +831,15 @@ class FirebaseFirestoreService {
       final doc = await _followedShopsRef.doc(shopId).get();
       if (doc.exists) {
         await _followedShopsRef.doc(shopId).delete();
+        await _firestore.collection('shops').doc(shopId).update({
+          'followerCount': FieldValue.increment(-1),
+        });
       } else {
         await _followedShopsRef.doc(shopId).set({
           'followedAt': FieldValue.serverTimestamp(),
+        });
+        await _firestore.collection('shops').doc(shopId).update({
+          'followerCount': FieldValue.increment(1),
         });
       }
     } catch (_) {}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../controllers/cart_controller.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../controllers/currency_controller.dart';
@@ -23,6 +24,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _loadingAddresses = true;
   List<Map<String, dynamic>> _userCards = [];
   List<Map<String, dynamic>> _userBanks = [];
+  // Guest checkout
+  final _guestName = TextEditingController();
+  final _guestEmail = TextEditingController();
+  final _guestAddress = TextEditingController();
 
   @override
   void initState() {
@@ -287,14 +292,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder() async {
     final auth = Get.find<AuthController>();
-    if (!auth.isLoggedIn.value) {
-      auth.requireAuth(message: 'Sign in to place an order.');
+    final isGuest = !auth.isLoggedIn.value;
+
+    if (isGuest &&
+        (_guestName.text.trim().isEmpty || _guestEmail.text.trim().isEmpty)) {
+      AppSnack.error(
+        'Info Required',
+        'Please enter your name and email to continue as guest.',
+      );
       return;
     }
+
+    // For guests, validate manual address
+    if (isGuest && _guestAddress.text.trim().isEmpty) {
+      AppSnack.error('Address Required', 'Please enter a shipping address.');
+      return;
+    }
+
     final cc = Get.find<CartController>();
     if (_placingOrder || cc.cartItems.isEmpty) return;
 
-    if (_selectedAddress == null) {
+    if (!isGuest && _selectedAddress == null) {
       AppSnack.error(
         'Address Required',
         'Please add a shipping address to continue.',
@@ -323,9 +341,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'quantity': item.quantity,
               'size': item.selectedSize,
               'color': item.selectedColor,
+              'productId': item.productId,
             },
           )
           .toList();
+
+      // ═══ Stock enforcement ═══
+      for (final item in cc.selectedItems) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('products')
+              .doc(item.productId)
+              .get();
+          if (doc.exists) {
+            final stock = (doc.data()?['stock'] as num?)?.toInt() ?? 0;
+            if (stock > 0 && item.quantity > stock) {
+              setState(() => _placingOrder = false);
+              AppSnack.error(
+                'Out of Stock',
+                '"${item.name}" only has $stock left. Please reduce quantity.',
+              );
+              return;
+            }
+            if (stock == 0) {
+              setState(() => _placingOrder = false);
+              AppSnack.error('Out of Stock', '"${item.name}" is out of stock.');
+              return;
+            }
+          }
+        } catch (_) {}
+      }
 
       await _firestoreService.createOrder(
         items: items,
@@ -336,6 +381,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         total: cc.selectedTotal,
         promoCode: cc.promoCode.value,
         paymentMethod: _selectedPaymentLabel,
+        guestName: isGuest ? _guestName.text.trim() : null,
+        guestEmail: isGuest ? _guestEmail.text.trim() : null,
       );
 
       if (!mounted) return;
@@ -386,6 +433,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cc = Get.find<CartController>();
+    final auth = Get.find<AuthController>();
     final curCtrl = Get.find<CurrencyController>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = Theme.of(context).cardColor;
@@ -429,6 +477,97 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Guest checkout fields
+              Obx(() {
+                if (auth.isLoggedIn.value) return const SizedBox.shrink();
+                return _card(
+                  bg,
+                  Column(
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            color: AppTheme.primaryColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Guest Checkout',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _guestName,
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          prefixIcon: const Icon(Icons.person, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: surface2,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _guestEmail,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: const Icon(
+                            Icons.email_outlined,
+                            size: 18,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: surface2,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _guestAddress,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Shipping Address',
+                          prefixIcon: const Icon(
+                            Icons.location_on_outlined,
+                            size: 18,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: surface2,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
               // Shipping Address
               _card(
                 bg,

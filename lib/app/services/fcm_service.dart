@@ -156,9 +156,21 @@ class FcmService {
       final unread = await _notifsRef.where('read', isEqualTo: false).get();
       final batch = _firestore.batch();
       for (final doc in unread.docs) {
-        batch.update(doc.reference, {'read': false});
+        batch.update(doc.reference, {'read': true});
       }
       await batch.commit();
     } catch (_) {}
+  }
+
+  /// Stream of unread notification count for badge display
+  Stream<int> getUnreadCountStream() {
+    try {
+      return _notifsRef
+          .where('read', isEqualTo: false)
+          .snapshots()
+          .map((snap) => snap.docs.length);
+    } catch (_) {
+      return Stream.value(0);
+    }
   }
 }

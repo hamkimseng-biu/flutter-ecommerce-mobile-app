@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:get/get.dart';
 import '../../../controllers/cart_controller.dart';
 import '../../../controllers/product_controller.dart';
@@ -6,6 +7,7 @@ import '../../../services/firebase_firestore_service.dart';
 import '../../../models/product_model.dart';
 import '../../../../../config/app_theme.dart';
 import '../../widgets/product_card.dart';
+import '../../widgets/search_bar_widget.dart';
 import '../../../routes/app_routes.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -25,11 +27,20 @@ class _SearchScreenState extends State<SearchScreen> {
   double _maxPrice = 1000;
   double _minRating = 0;
   final RxBool _showFilters = false.obs;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _search();
+    });
   }
 
   Future<void> _search() async {
@@ -77,19 +88,11 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0.5,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         titleSpacing: 4,
-        title: TextField(
-          controller: _searchCtrl,
-          autofocus: true,
-          onSubmitted: (_) => _search(),
-          style: TextStyle(fontSize: 15, color: textPri),
-          cursorColor: AppTheme.primaryColor,
-          decoration: InputDecoration(
-            hintText: 'Search products...',
-            hintStyle: TextStyle(fontSize: 14, color: textSec),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Get.back(),
         ),
         actions: [
           Obx(
@@ -104,16 +107,24 @@ class _SearchScreenState extends State<SearchScreen> {
               splashRadius: 20,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: _search,
-            splashRadius: 20,
-          ),
           const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: [
+          // Search bar — matches home page exactly
+          Padding(
+            padding: const EdgeInsets.fromLTRB(13, 4, 16, 4),
+            child: SearchBarWidget(
+              controller: _searchCtrl,
+              autofocus: true,
+              onChanged: (v) {
+                setState(() {});
+                _onSearchChanged(v);
+              },
+              onSubmitted: (_) => _search(),
+            ),
+          ),
           // Filters bar
           Obx(() {
             if (!_showFilters.value) return const SizedBox.shrink();

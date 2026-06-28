@@ -206,7 +206,9 @@ class _ShopperHistoryScreenState extends State<ShopperHistoryScreen> {
                                   : FontWeight.w500,
                               color: active
                                   ? AppTheme.primaryColor
-                                  : Colors.grey.shade500,
+                                  : (isDark
+                                        ? Colors.white54
+                                        : Colors.grey.shade500),
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -254,7 +256,10 @@ class _ShopperHistoryScreenState extends State<ShopperHistoryScreen> {
             const SizedBox(height: 4),
             Text(
               _emptySub(),
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white54 : Colors.grey.shade500,
+              ),
             ),
           ],
         ),

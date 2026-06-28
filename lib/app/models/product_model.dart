@@ -13,6 +13,10 @@ class ProductModel {
   final int reviewCount;
   final List<String> sizes;
   final List<String> colors;
+  final List<String> materials;
+
+  /// Admin-defined custom variant types. e.g. {'Style': ['Modern','Classic'], 'Weight': ['1kg','2kg']}
+  final Map<String, List<String>> customVariants;
   final bool isFavorite;
   final int stock;
   final String sellerId;
@@ -45,6 +49,8 @@ class ProductModel {
     this.reviewCount = 0,
     this.sizes = const ['S', 'M', 'L', 'XL'],
     this.colors = const [],
+    this.materials = const [],
+    this.customVariants = const {},
     this.isFavorite = false,
     this.stock = 10,
     this.sellerId = '',
@@ -82,6 +88,8 @@ class ProductModel {
     int? reviewCount,
     List<String>? sizes,
     List<String>? colors,
+    List<String>? materials,
+    Map<String, List<String>>? customVariants,
     bool? isFavorite,
     int? stock,
     String? sellerId,
@@ -111,6 +119,8 @@ class ProductModel {
       reviewCount: reviewCount ?? this.reviewCount,
       sizes: sizes ?? this.sizes,
       colors: colors ?? this.colors,
+      materials: materials ?? this.materials,
+      customVariants: customVariants ?? this.customVariants,
       isFavorite: isFavorite ?? this.isFavorite,
       stock: stock ?? this.stock,
       sellerId: sellerId ?? this.sellerId,
@@ -146,6 +156,8 @@ class ProductModel {
       reviewCount: data['reviewCount'] ?? 0,
       sizes: List<String>.from(data['sizes'] ?? ['S', 'M', 'L', 'XL']),
       colors: List<String>.from(data['colors'] ?? []),
+      materials: List<String>.from(data['materials'] ?? []),
+      customVariants: _parseVariants(data['customVariants']),
       isFavorite: data['isFavorite'] ?? false,
       stock: data['stock'] ?? 10,
       sellerId: data['sellerId'] ?? '',
@@ -177,6 +189,8 @@ class ProductModel {
       'reviewCount': reviewCount,
       'sizes': sizes,
       'colors': colors,
+      'materials': materials,
+      'customVariants': customVariants.map((k, v) => MapEntry(k, v)),
       'isFavorite': isFavorite,
       'stock': stock,
       'sellerId': sellerId,
@@ -193,5 +207,11 @@ class ProductModel {
       'showReviewCount': showReviewCount,
       'freeShipping': freeShipping,
     };
+  }
+
+  static Map<String, List<String>> _parseVariants(dynamic data) {
+    if (data == null) return {};
+    final map = Map<String, dynamic>.from(data as Map);
+    return map.map((k, v) => MapEntry(k, List<String>.from(v as List)));
   }
 }

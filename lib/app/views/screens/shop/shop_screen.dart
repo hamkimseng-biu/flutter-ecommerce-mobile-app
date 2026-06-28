@@ -28,9 +28,18 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   void initState() {
     super.initState();
-    final seller = Get.arguments as SellerModel;
-    _checkFollowStatus(seller.id);
+    final args = Get.arguments;
+    if (args is SellerModel) {
+      _sellerId = args.id;
+    } else if (args is String) {
+      _sellerId = args;
+    } else if (args is Map) {
+      _sellerId = args['id'] ?? args['sellerId'] ?? '';
+    }
+    _checkFollowStatus(_sellerId);
   }
+
+  String _sellerId = '';
 
   Future<void> _checkFollowStatus(String shopId) async {
     final following = await _firestore.isShopFollowed(shopId);
@@ -65,442 +74,474 @@ class _ShopScreenState extends State<ShopScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      builder: (_) {
+        final isSheetDark = Theme.of(context).brightness == Brightness.dark;
+        final sheetText = isSheetDark ? Colors.white : Colors.black87;
+        final sheetSubText = isSheetDark ? Colors.white70 : Colors.black54;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Sort & Filter',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              title: const Text('Default'),
-              leading: Icon(
-                Icons.sort,
-                color: _sortBy == 'default'
-                    ? AppTheme.primaryColor
-                    : Colors.grey,
+              const SizedBox(height: 16),
+              Text(
+                'Sort & Filter',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: sheetText,
+                ),
               ),
-              onTap: () {
-                setState(() => _sortBy = 'default');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Price: Low to High'),
-              leading: Icon(
-                Icons.trending_up,
-                color: _sortBy == 'price-asc'
-                    ? AppTheme.primaryColor
-                    : Colors.grey,
+              const SizedBox(height: 12),
+              ListTile(
+                title: Text('Default', style: TextStyle(color: sheetText)),
+                leading: Icon(
+                  Icons.sort,
+                  color: _sortBy == 'default'
+                      ? AppTheme.primaryColor
+                      : sheetSubText,
+                ),
+                onTap: () {
+                  setState(() => _sortBy = 'default');
+                  Navigator.pop(context);
+                },
               ),
-              onTap: () {
-                setState(() => _sortBy = 'price-asc');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Price: High to Low'),
-              leading: Icon(
-                Icons.trending_down,
-                color: _sortBy == 'price-desc'
-                    ? AppTheme.primaryColor
-                    : Colors.grey,
+              ListTile(
+                title: Text(
+                  'Price: Low to High',
+                  style: TextStyle(color: sheetText),
+                ),
+                leading: Icon(
+                  Icons.trending_up,
+                  color: _sortBy == 'price-asc'
+                      ? AppTheme.primaryColor
+                      : sheetSubText,
+                ),
+                onTap: () {
+                  setState(() => _sortBy = 'price-asc');
+                  Navigator.pop(context);
+                },
               ),
-              onTap: () {
-                setState(() => _sortBy = 'price-desc');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Top Rated'),
-              leading: Icon(
-                Icons.star,
-                color: _sortBy == 'rating'
-                    ? AppTheme.primaryColor
-                    : Colors.grey,
+              ListTile(
+                title: Text(
+                  'Price: High to Low',
+                  style: TextStyle(color: sheetText),
+                ),
+                leading: Icon(
+                  Icons.trending_down,
+                  color: _sortBy == 'price-desc'
+                      ? AppTheme.primaryColor
+                      : sheetSubText,
+                ),
+                onTap: () {
+                  setState(() => _sortBy = 'price-desc');
+                  Navigator.pop(context);
+                },
               ),
-              onTap: () {
-                setState(() => _sortBy = 'rating');
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Text(
-                    'Size: ',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children:
-                            ['S', 'M', 'L', 'XL']
-                                .map(
-                                  (s) => Padding(
-                                    padding: const EdgeInsets.only(right: 6),
-                                    child: FilterChip(
-                                      label: Text(s),
-                                      selected: _filterSize == s,
-                                      onSelected: (v) => setState(
-                                        () => _filterSize = v ? s : null,
-                                      ),
-                                      selectedColor: AppTheme.primaryColor,
-                                      checkmarkColor: Colors.white,
-                                    ),
-                                  ),
-                                )
-                                .toList()
-                              ..insert(
-                                0,
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: FilterChip(
-                                    label: const Text('All'),
-                                    selected: _filterSize == null,
-                                    onSelected: (_) =>
-                                        setState(() => _filterSize = null),
-                                    selectedColor: AppTheme.primaryColor,
-                                    checkmarkColor: Colors.white,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
+              ListTile(
+                title: Text('Top Rated', style: TextStyle(color: sheetText)),
+                leading: Icon(
+                  Icons.star,
+                  color: _sortBy == 'rating'
+                      ? AppTheme.primaryColor
+                      : sheetSubText,
+                ),
+                onTap: () {
+                  setState(() => _sortBy = 'rating');
+                  Navigator.pop(context);
+                },
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final seller = Get.arguments as SellerModel;
-    final products = pc.getProductsBySeller(seller.id);
+    String fmt(int c) =>
+        c >= 1000 ? '${(c / 1000).toStringAsFixed(1)}k' : c.toString();
+    final products = pc.getProductsBySeller(_sellerId);
     final sorted = _sorted(products);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = Theme.of(context).cardColor;
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async => pc.loadProducts(),
-        color: AppTheme.primaryColor,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 200,
-              pinned: true,
-              leading: GestureDetector(
-                onTap: () => Get.back(),
-                child: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
-                  ),
-                ),
+    Widget sortChip(BuildContext ctx, bool dark) => GestureDetector(
+      onTap: _showSortSheet,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: dark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: dark ? Colors.white10 : const Color(0xFFE0E0E0),
+          ),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, size: 16, color: AppTheme.primaryColor),
+            SizedBox(width: 4),
+            Text(
+              'Sort & Filter',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor,
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    seller.banner.isNotEmpty
-                        ? Image.network(
-                            seller.banner,
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) => Container(
-                              color: AppTheme.primaryColor.withValues(
-                                alpha: 0.2,
-                              ),
-                            ),
-                          )
-                        : Container(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                          ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.55),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 70,
-                      left: 20,
-                      right: 20,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 54,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.25),
-                                  blurRadius: 10,
-                                ),
-                              ],
-                            ),
-                            child: seller.logoUrl.isNotEmpty
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: Image.network(
-                                      seller.logoUrl,
-                                      width: 54,
-                                      height: 54,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Text(
-                                        seller.avatar,
-                                        style: const TextStyle(fontSize: 30),
-                                      ),
-                                    ),
-                                  )
-                                : Text(
-                                    seller.avatar,
-                                    style: const TextStyle(fontSize: 30),
-                                  ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        seller.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (seller.isOfficial) ...[
-                                      const SizedBox(width: 6),
-                                      const Icon(
-                                        Icons.verified,
-                                        color: AppTheme.primaryColor,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_fmt(seller.followerCount)} followers · ${seller.productCount} products',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Obx(
-                            () => ElevatedButton(
-                              onPressed: () async {
-                                await _firestore.toggleFollowShop(seller.id);
-                                isFollowing.toggle();
-                                AppSnack.success(
-                                  isFollowing.value
-                                      ? 'Following'
-                                      : 'Unfollowed',
-                                  isFollowing.value
-                                      ? 'You are now following ${seller.name}'
-                                      : 'You unfollowed ${seller.name}',
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size(72, 34),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                backgroundColor: isFollowing.value
-                                    ? AppTheme.primaryColor
-                                    : Colors.white,
-                                foregroundColor: isFollowing.value
-                                    ? Colors.white
-                                    : AppTheme.primaryColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              child: Text(
-                                isFollowing.value ? 'Following' : 'Follow',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: AppTheme.secondaryColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${seller.rating}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            seller.description,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyMedium?.color,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 18,
-                          color: AppTheme.primaryColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${sorted.length} Products',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: products.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.inventory_2_outlined,
-                                size: 56,
-                                color: Theme.of(
-                                  context,
-                                ).textTheme.bodyMedium?.color,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No products yet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyMedium?.color,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.68,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                      delegate: SliverChildBuilderDelegate(
-                        (ctx, i) => ProductCard(
-                          product: sorted[i],
-                          onTap: () => Get.toNamed(
-                            AppRoutes.productDetail,
-                            arguments: sorted[i],
-                          ),
-                          onAddToCart: () => cc.addToCart(sorted[i]),
-                        ),
-                        childCount: sorted.length,
-                      ),
-                    ),
             ),
           ],
         ),
       ),
     );
-  }
 
-  String _fmt(int c) =>
-      c >= 1000 ? '${(c / 1000).toStringAsFixed(1)}k' : c.toString();
+    return Obx(() {
+      final seller = pc.getSellerById(_sellerId);
+      final productCount = pc.getSellerProductCount(_sellerId);
+      if (seller == null)
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      final sellerName = seller.name;
+      final sellerBanner = seller.banner;
+      final sellerLogo = seller.logoUrl;
+      final sellerAvatar = seller.avatar;
+      final sellerOfficial = seller.isOfficial;
+      final sellerFollowers = seller.followerCount;
+      final sellerRating = seller.rating;
+      final sellerDesc = seller.description;
+
+      return Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () async => pc.loadProducts(),
+          color: AppTheme.primaryColor,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 200,
+                pinned: true,
+                leading: GestureDetector(
+                  onTap: () => Get.back(),
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      sellerBanner.isNotEmpty
+                          ? Image.network(
+                              sellerBanner,
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => Container(
+                                color: AppTheme.primaryColor.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: AppTheme.primaryColor.withValues(
+                                alpha: 0.2,
+                              ),
+                            ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.55),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 70,
+                        left: 20,
+                        right: 20,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: sellerLogo.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: Image.network(
+                                        sellerLogo,
+                                        width: 54,
+                                        height: 54,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Text(
+                                          sellerAvatar,
+                                          style: const TextStyle(fontSize: 30),
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      sellerAvatar,
+                                      style: const TextStyle(fontSize: 30),
+                                    ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          sellerName,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (sellerOfficial) ...[
+                                        const SizedBox(width: 6),
+                                        const Icon(
+                                          Icons.verified,
+                                          color: AppTheme.primaryColor,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${fmt(sellerFollowers)} followers · ${productCount} products',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Obx(
+                              () => ElevatedButton(
+                                onPressed: () async {
+                                  await _firestore.toggleFollowShop(_sellerId);
+                                  isFollowing.toggle();
+                                  AppSnack.success(
+                                    isFollowing.value
+                                        ? 'Following'
+                                        : 'Unfollowed',
+                                    isFollowing.value
+                                        ? 'You are now following ${sellerName}'
+                                        : 'You unfollowed ${sellerName}',
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(72, 34),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  backgroundColor: isFollowing.value
+                                      ? AppTheme.primaryColor
+                                      : Colors.white,
+                                  foregroundColor: isFollowing.value
+                                      ? Colors.white
+                                      : AppTheme.primaryColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                child: Text(
+                                  isFollowing.value ? 'Following' : 'Follow',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Shop description row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            color: AppTheme.secondaryColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${sellerRating}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              sellerDesc,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? AppTheme.darkTextSecondary
+                                    : const Color(0xFF666666),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      // Stats + sort row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 16,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${sorted.length} Products',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          sortChip(context, isDark),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: products.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(40),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 56,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium?.color,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No products yet',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium?.color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.68,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, i) => ProductCard(
+                            product: sorted[i],
+                            onTap: () => Get.toNamed(
+                              AppRoutes.productDetail,
+                              arguments: sorted[i],
+                            ),
+                            onAddToCart: () => cc.addToCart(sorted[i]),
+                          ),
+                          childCount: sorted.length,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
 }

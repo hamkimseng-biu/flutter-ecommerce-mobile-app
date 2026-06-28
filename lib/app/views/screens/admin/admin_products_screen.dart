@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -65,6 +66,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   final TextEditingController _orderSearchCtrl = TextEditingController();
   String _orderStatusFilter = 'All';
   String _orderSearchQuery = '';
+
+  // Admin search state — persists across rebuilds
+  final TextEditingController _adminSearchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _adminSuggestions = [];
+  bool _adminSearching = false;
+  Timer? _adminDebounce;
+  bool _showAdminSuggestions = false;
 
   static const _orderStatuses = [
     'All',
@@ -144,6 +152,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
 
   @override
   void dispose() {
+    _adminDebounce?.cancel();
+    _adminSearchCtrl.dispose();
     _tabCtrl.dispose();
     _orderSearchCtrl.dispose();
     _productSearchCtrl.dispose();
@@ -392,15 +402,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Add new admin
+                  // Add new admin with real-time user search
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: addCtrl,
+                          controller: _adminSearchCtrl,
                           decoration: InputDecoration(
-                            hintText: 'email@example.com',
+                            hintText: 'Search users by name or email…',
                             isDense: true,
+                            prefixIcon: _adminSearching
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.search, size: 18),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 12,
@@ -414,41 +436,86 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                 : const Color(0xFFF1F3F5),
                           ),
                           keyboardType: TextInputType.emailAddress,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      FilledButton.icon(
-                        onPressed: () async {
-                          final newEmail = addCtrl.text.trim().toLowerCase();
-                          if (newEmail.isEmpty || !newEmail.contains('@')) {
-                            AppSnack.error('Invalid', 'Enter a valid email.');
-                            return;
-                          }
-                          if (emails.contains(newEmail)) {
-                            AppSnack.info('Exists', 'Already an admin.');
-                            return;
-                          }
-                          emails.add(newEmail);
-                          await _saveAdminEmails(emails);
-                          addCtrl.clear();
-                          setD(() {});
-                          AppSnack.success(
-                            'Added',
-                            '$newEmail is now an admin.',
-                          );
-                        },
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Add'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
+                          onChanged: _onAdminSearchChanged,
+                          onTap: () {
+                            if (_adminSuggestions.isNotEmpty) {
+                              setState(() => _showAdminSuggestions = true);
+                            }
+                          },
                         ),
                       ),
                     ],
                   ),
+                  if (_showAdminSuggestions && _adminSuggestions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _adminSuggestions.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: isDark ? Colors.white10 : Colors.grey.shade100,
+                        ),
+                        itemBuilder: (_, i) {
+                          final u = _adminSuggestions[i];
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: AppTheme.primaryColor.withValues(
+                                alpha: 0.1,
+                              ),
+                              child: Text(
+                                (u['name'] as String)
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              u['name'] as String,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            subtitle: Text(
+                              u['email'] as String,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? Colors.white54
+                                    : Colors.grey.shade500,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.add_circle_outline,
+                              size: 20,
+                              color: AppTheme.primaryColor,
+                            ),
+                            onTap: () => _addAdminByEmail(
+                              u['email'] as String,
+                              u['name'] as String,
+                              emails,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   // Admin list
                   Expanded(
@@ -576,6 +643,49 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       'emails': emails,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  void _onAdminSearchChanged(String q) {
+    _adminDebounce?.cancel();
+    if (q.trim().isEmpty) {
+      setState(() {
+        _adminSuggestions = [];
+        _showAdminSuggestions = false;
+      });
+      return;
+    }
+    _adminDebounce = Timer(const Duration(milliseconds: 300), () async {
+      setState(() => _adminSearching = true);
+      final results = await _firestoreService.searchUsers(q);
+      if (mounted) {
+        setState(() {
+          _adminSuggestions = results;
+          _adminSearching = false;
+          _showAdminSuggestions = true;
+        });
+      }
+    });
+  }
+
+  Future<void> _addAdminByEmail(
+    String email,
+    String name,
+    List<String> emails,
+  ) async {
+    final e = email.trim().toLowerCase();
+    if (e.isEmpty || !e.contains('@')) return;
+    if (emails.contains(e)) {
+      AppSnack.info('Exists', '$name is already an admin.');
+      return;
+    }
+    emails.add(e);
+    await _saveAdminEmails(emails);
+    _adminSearchCtrl.clear();
+    setState(() {
+      _adminSuggestions = [];
+      _showAdminSuggestions = false;
+    });
+    AppSnack.success('Added', '$name ($e) is now an admin.');
   }
 
   @override
@@ -805,7 +915,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                       hintText: 'Search products...',
                       hintStyle: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey.shade400,
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
                       ),
                       prefixIcon: const Icon(Icons.search, size: 18),
                       suffixIcon: _productSearchQuery.isNotEmpty
@@ -1033,7 +1143,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                     'Stock: ${p.stock} · ${p.category}',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey.shade500,
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.grey.shade500,
                                     ),
                                   ),
                                 ],
@@ -1119,7 +1231,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                       hintText: 'Search orders...',
                       hintStyle: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey.shade400,
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
                       ),
                       prefixIcon: const Icon(Icons.search, size: 18),
                       suffixIcon: _orderSearchQuery.isNotEmpty
@@ -1355,7 +1467,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                               '${userOrders.length} order${userOrders.length > 1 ? 's' : ''}',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade500,
+                                color: isDark
+                                    ? Colors.white54
+                                    : Colors.grey.shade500,
                               ),
                             ),
                           ],
@@ -1495,7 +1609,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                       '+${(o['items'] as List).length - 3}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade500,
+                                        color: isDark
+                                            ? Colors.white54
+                                            : Colors.grey.shade500,
                                       ),
                                     ),
                                   const Spacer(),
@@ -1515,28 +1631,36 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                   Icon(
                                     Icons.payment,
                                     size: 14,
-                                    color: Colors.grey.shade400,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : Colors.grey.shade400,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     o['paymentMethod'] as String? ?? 'N/A',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey.shade500,
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.grey.shade500,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   Icon(
                                     Icons.calendar_today,
                                     size: 12,
-                                    color: Colors.grey.shade400,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : Colors.grey.shade400,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     o['date'] as String? ?? '',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey.shade500,
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.grey.shade500,
                                     ),
                                   ),
                                   const Spacer(),
@@ -1544,7 +1668,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                     'User: ${(o['userId'] as String).substring(0, 6)}...',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.grey.shade400,
+                                      color: isDark
+                                          ? Colors.white38
+                                          : Colors.grey.shade400,
                                     ),
                                   ),
                                 ],
@@ -1636,7 +1762,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                     hintText: 'Search shops...',
                     hintStyle: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade400,
+                      color: isDark ? Colors.white38 : Colors.grey.shade400,
                     ),
                     prefixIcon: const Icon(Icons.search, size: 18),
                     suffixIcon: _shopSearchQuery.isNotEmpty
@@ -1758,7 +1884,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                       d['description'] ?? '',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.grey.shade500,
+                                        color: isDark
+                                            ? Colors.white54
+                                            : Colors.grey.shade500,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1810,7 +1938,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                   decoration: BoxDecoration(
                                     color: (d['isPopular'] == true)
                                         ? AppTheme.secondaryColor
-                                        : Colors.grey.shade300,
+                                        : (isDark
+                                              ? Colors.white12
+                                              : Colors.grey.shade300),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
@@ -1823,7 +1953,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                         size: 10,
                                         color: (d['isPopular'] == true)
                                             ? Colors.white
-                                            : Colors.grey.shade600,
+                                            : (isDark
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade600),
                                       ),
                                       const SizedBox(width: 2),
                                       Text(
@@ -1833,7 +1965,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                           fontWeight: FontWeight.w700,
                                           color: (d['isPopular'] == true)
                                               ? Colors.white
-                                              : Colors.grey.shade600,
+                                              : (isDark
+                                                    ? Colors.white70
+                                                    : Colors.grey.shade600),
                                         ),
                                       ),
                                     ],
@@ -1931,7 +2065,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                     hintText: 'Search categories...',
                     hintStyle: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade400,
+                      color: isDark ? Colors.white38 : Colors.grey.shade400,
                     ),
                     prefixIcon: const Icon(Icons.search, size: 18),
                     suffixIcon: _catSearchQuery.isNotEmpty
@@ -2201,11 +2335,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final c = await AppDialog.deleteConfirm(
       title: 'Delete Shop?',
       message:
-          'This cannot be undone. Products belonging to this shop will remain but show as "Unknown Shop".',
+          'Products belonging to this shop will be marked as "Unknown Shop".',
     );
     if (c != true) return;
     try {
-      await _firestore.collection('shops').doc(doc.id).delete();
+      final shopId = doc.id;
+      // Mark all products from this shop as "Unknown Shop"
+      final productsSnap = await _firestore
+          .collection('products')
+          .where('sellerId', isEqualTo: shopId)
+          .get();
+      if (productsSnap.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final p in productsSnap.docs) {
+          batch.update(p.reference, {
+            'sellerName': 'Unknown Shop',
+            'sellerAvatar': '🏪',
+          });
+        }
+        await batch.commit();
+      }
+      await _firestore.collection('shops').doc(shopId).delete();
       AppSnack.success('Deleted', 'Shop removed.');
     } catch (_) {
       AppSnack.error('Error', 'Failed to delete shop.');

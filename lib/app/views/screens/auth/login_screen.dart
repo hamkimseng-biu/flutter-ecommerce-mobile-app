@@ -41,11 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onInputChanged() {
     final raw = _emailOrPhoneController.text;
     final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
-    // Phone if: no @ and 3+ digits (most reliable)
-    final looksLikePhone = !raw.contains('@') && digits.length >= 3;
+    // Phone if: no @, no letters, first char is a digit
+    final looksLikePhone =
+        !raw.contains('@') &&
+        !raw.contains(RegExp(r'[a-zA-Z]')) &&
+        raw.trim().isNotEmpty &&
+        RegExp(r'^\d').hasMatch(raw.trim());
     if (_isPhone != looksLikePhone) setState(() => _isPhone = looksLikePhone);
-    // Live phone formatting with spaces
-    if (looksLikePhone) {
+    // Live phone formatting — only when still in phone mode
+    if (looksLikePhone && digits.isNotEmpty) {
       final formatted = _formatPhone(digits);
       if (formatted != raw) {
         final sel = _emailOrPhoneController.selection.baseOffset;
@@ -114,6 +118,13 @@ class _LoginScreenState extends State<LoginScreen> {
       AppSnack.error('Google Sign-In Failed', error);
   }
 
+  Future<void> _handleFacebookSignIn() async {
+    final auth = Get.find<AuthController>();
+    final error = await auth.signInWithFacebook();
+    if (error != null && mounted)
+      AppSnack.error('Facebook Sign-In Failed', error);
+  }
+
   void _handleForgotPassword() => Get.toNamed(AppRoutes.forgotPassword);
 
   void _focusPhoneField() {
@@ -139,16 +150,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 48),
                 Center(
                   child: Container(
-                    width: 72,
-                    height: 72,
+                    width: 90,
+                    height: 90,
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                    child: const Icon(
-                      Icons.shopping_bag_outlined,
-                      size: 36,
-                      color: AppTheme.primaryColor,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset(
+                        'assets/logo/Chicken Logo.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
@@ -318,6 +331,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _socialIcon(
+                      onTap: auth.isLoading.value
+                          ? null
+                          : _handleFacebookSignIn,
+                      asset: 'assets/logo/icons8-facebook-100.png',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 20),
+                    _socialIcon(
                       onTap: auth.isLoading.value ? null : _handleGoogleSignIn,
                       asset: 'assets/logo/icons8-google-logo-96.png',
                       isDark: isDark,
@@ -325,13 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 20),
                     _socialIcon(
                       onTap: auth.isLoading.value ? null : _focusPhoneField,
-                      icon: Icons.phone_android,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 20),
-                    _socialIcon(
-                      onTap: () {},
-                      asset: 'assets/logo/Facebook-Logosu-500x281.png',
+                      asset: 'assets/logo/icons8-phone-100.png',
                       isDark: isDark,
                     ),
                   ],
@@ -391,12 +406,17 @@ class _LoginScreenState extends State<LoginScreen> {
     String? asset,
     IconData? icon,
     required bool isDark,
+    double? imageWidth,
+    double? imageHeight,
   }) {
+    final imgW = imageWidth ?? 36;
+    final imgH = imageHeight ?? 36;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 52,
         height: 52,
+        clipBehavior: Clip.none,
         decoration: BoxDecoration(
           color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -404,8 +424,17 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: Center(
           child: asset != null
-              ? Image.asset(asset, width: 36, height: 36, fit: BoxFit.contain)
-              : Icon(icon, size: 26, color: Colors.grey.shade700),
+              ? Image.asset(
+                  asset,
+                  width: imgW,
+                  height: imgH,
+                  fit: BoxFit.contain,
+                )
+              : Icon(
+                  icon,
+                  size: 26,
+                  color: isDark ? Colors.white70 : Colors.grey.shade700,
+                ),
         ),
       ),
     );

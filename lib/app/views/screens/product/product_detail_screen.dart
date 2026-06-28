@@ -38,6 +38,29 @@ class ProductDetailScreen extends StatelessWidget {
     // Get seller for navigation
     final seller = pc.getSellerById(product.sellerId);
 
+    Widget sellerIcon() {
+      final logoUrl = seller?.logoUrl;
+      if (logoUrl != null && logoUrl.isNotEmpty && logoUrl.startsWith('http')) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.network(
+            logoUrl,
+            width: 20,
+            height: 20,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Text(
+              seller?.avatar ?? product.sellerAvatar,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        );
+      }
+      final emoji = seller?.avatar.isNotEmpty == true
+          ? seller!.avatar
+          : product.sellerAvatar;
+      return Text(emoji, style: const TextStyle(fontSize: 16));
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -73,11 +96,10 @@ class ProductDetailScreen extends StatelessWidget {
                             // Seller chip → navigates to shop
                             GestureDetector(
                               onTap: () {
-                                if (seller != null)
-                                  Get.toNamed(
-                                    AppRoutes.shop,
-                                    arguments: seller,
-                                  );
+                                Get.toNamed(
+                                  AppRoutes.shop,
+                                  arguments: product.sellerId,
+                                );
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -93,13 +115,10 @@ class ProductDetailScreen extends StatelessWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      product.sellerAvatar,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
+                                    sellerIcon(),
                                     const SizedBox(width: 6),
                                     Text(
-                                      product.sellerName,
+                                      seller?.name ?? product.sellerName,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -459,6 +478,16 @@ class ProductDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // ═══ RELATED PRODUCTS (full-width) ═══
+                    SliverToBoxAdapter(
+                      child: _RelatedProductsSection(
+                        product: product,
+                        pc: pc,
+                        cc: cc,
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
                     // ═══ PRODUCT IMAGES GALLERY (edge-to-edge) ═══
                     if (product.detailImages.isNotEmpty ||
                         product.images.length > 1)
@@ -1294,6 +1323,390 @@ class _ImageSlideshowState extends State<_ImageSlideshow> {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RELATED PRODUCTS SECTION
+// ═══════════════════════════════════════════════════════════════
+class _RelatedProductsSection extends StatelessWidget {
+  final ProductModel product;
+  final ProductController pc;
+  final CartController cc;
+  final bool isDark;
+  const _RelatedProductsSection({
+    required this.product,
+    required this.pc,
+    required this.cc,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final related = pc.getRelatedProducts(
+      product.id,
+      category: product.category,
+    );
+    if (related.isEmpty) return const SizedBox.shrink();
+
+    final curCtrl = Get.find<CurrencyController>();
+    final wc = Get.find<WishlistController>();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface2 : const Color(0xFFECEDF0),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'You Might Also Like',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '${related.length} items',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 300,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: related.map((p) {
+                  final bg = isDark ? AppTheme.darkSurface : Colors.white;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      width: 170,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          Get.to(
+                            () => const ProductDetailScreen(),
+                            arguments: p,
+                            preventDuplicates: false,
+                          );
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── Image + Badges ──
+                              Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(12),
+                                    ),
+                                    child: SizedBox(
+                                      height: 150,
+                                      width: double.infinity,
+                                      child: p.images.isNotEmpty
+                                          ? Image.network(
+                                              p.images[0],
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  const Icon(
+                                                    Icons.image_outlined,
+                                                    size: 36,
+                                                    color: Colors.grey,
+                                                  ),
+                                            )
+                                          : const Icon(
+                                              Icons.image_outlined,
+                                              size: 36,
+                                              color: Colors.grey,
+                                            ),
+                                    ),
+                                  ),
+                                  // Discount % badge
+                                  if (p.discountPercentDisplay > 3)
+                                    Positioned(
+                                      top: 6,
+                                      left: 6,
+                                      child: _badge(
+                                        '-${p.discountPercentDisplay.toInt()}%',
+                                        p.isFlashSale
+                                            ? AppTheme.flashSaleColor
+                                            : AppTheme.errorColor,
+                                      ),
+                                    ),
+                                  // FLASH badge
+                                  if (p.isFlashSale &&
+                                      p.discountPercentDisplay <= 3)
+                                    Positioned(
+                                      top: 6,
+                                      left: 6,
+                                      child: _badge(
+                                        'FLASH',
+                                        Colors.amber,
+                                        icon: Icons.bolt,
+                                        sz: 8,
+                                      ),
+                                    ),
+                                  if (p.isFlashSale &&
+                                      p.discountPercentDisplay > 3)
+                                    Positioned(
+                                      top: 22,
+                                      left: 6,
+                                      child: _badge(
+                                        'FLASH',
+                                        Colors.amber,
+                                        icon: Icons.bolt,
+                                        sz: 8,
+                                      ),
+                                    ),
+                                  // Sold count badge
+                                  if (p.showSoldCount && p.soldCount > 1000)
+                                    Positioned(
+                                      bottom: 4,
+                                      left: 4,
+                                      child: _badge(
+                                        '${(p.soldCount / 1000).toStringAsFixed(1)}k sold',
+                                        Colors.black54,
+                                      ),
+                                    ),
+                                  // Free shipping badge
+                                  if (p.freeShipping)
+                                    Positioned(
+                                      bottom: 4,
+                                      right: 4,
+                                      child: _badge(
+                                        'Free Ship',
+                                        AppTheme.successColor.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                        sz: 7,
+                                      ),
+                                    ),
+                                  // Wishlist heart
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: Obx(() {
+                                      final fav = wc.isInWishlist(p.id);
+                                      return GestureDetector(
+                                        onTap: () => wc.toggleWishlist(p),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? Colors.white12
+                                                : Colors.white.withValues(
+                                                    alpha: 0.85,
+                                                  ),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(
+                                                  alpha: isDark ? 0.3 : 0.06,
+                                                ),
+                                                blurRadius: 3,
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            fav
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color: fav
+                                                ? AppTheme.errorColor
+                                                : (isDark
+                                                      ? Colors.white54
+                                                      : Colors.grey),
+                                            size: 16,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ),
+                                ],
+                              ),
+                              // ── Info ──
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        p.sellerName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDark
+                                              ? Colors.white54
+                                              : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      if (p.showRating)
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.star_rounded,
+                                              color: AppTheme.secondaryColor,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '${p.rating}',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            if (p.showReviewCount) ...[
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                '(${p.reviewCount})',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  color: isDark
+                                                      ? Colors.white54
+                                                      : const Color(0xFF9E9EAA),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      const Spacer(),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                curCtrl.formatPriceCompact(
+                                                  p.effectivePrice,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppTheme.primaryColor,
+                                                ),
+                                              ),
+                                              if (p.originalPrice > 0 &&
+                                                  p.discountPercentDisplay > 0)
+                                                Text(
+                                                  curCtrl.formatPriceCompact(
+                                                    p.originalPrice,
+                                                  ),
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark
+                                                        ? Colors.white54
+                                                        : const Color(
+                                                            0xFF9E9EAA,
+                                                          ),
+                                                    decoration: TextDecoration
+                                                        .lineThrough,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => cc.addToCart(p),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(7),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(
+                                                Icons.add_shopping_cart_rounded,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _badge(String text, Color bg, {IconData? icon, double sz = 8}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: sz, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: Colors.white),
+            const SizedBox(width: 2),
+          ],
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

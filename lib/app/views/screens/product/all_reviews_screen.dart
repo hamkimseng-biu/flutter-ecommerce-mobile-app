@@ -107,7 +107,10 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
             const Text('All Reviews', style: TextStyle(fontSize: 16)),
             Text(
               widget.productName,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : Colors.grey.shade500,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

@@ -52,6 +52,7 @@ class OrderDetailScreen extends StatelessWidget {
     Map<String, dynamic> firestoreData,
     String? firestoreId,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = Theme.of(context).cardColor;
     final status =
         firestoreData['status'] as String? ?? order['status'] as String;
@@ -101,7 +102,10 @@ class OrderDetailScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$date · $itemCount items',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
+                  ),
                 ),
               ],
             ),
@@ -433,6 +437,7 @@ class OrderDetailScreen extends StatelessWidget {
     bool bold = false,
     bool primary = false,
   }) {
+    final isDark = Theme.of(Get.context!).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -440,7 +445,10 @@ class OrderDetailScreen extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.white70 : Colors.grey.shade600,
+            ),
           ),
           Text(
             value,

@@ -87,7 +87,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(32),
                     child: Image.asset(
-                      'assets/images/icon.png',
+                      'assets/logo/Chicken Logo.png',
                       width: 110,
                       height: 110,
                       fit: BoxFit.cover,

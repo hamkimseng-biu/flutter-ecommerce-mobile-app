@@ -392,6 +392,7 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
   }
 
   Widget _typeCard(String type, String label, IconData icon, bool selected) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => setState(() => _accountType = type),
       child: Container(
@@ -410,7 +411,9 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
           children: [
             Icon(
               icon,
-              color: selected ? AppTheme.primaryColor : Colors.grey.shade400,
+              color: selected
+                  ? AppTheme.primaryColor
+                  : (isDark ? Colors.white38 : Colors.grey.shade400),
               size: 28,
             ),
             const SizedBox(height: 8),
@@ -419,7 +422,9 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? AppTheme.primaryColor : Colors.grey.shade600,
+                color: selected
+                    ? AppTheme.primaryColor
+                    : (isDark ? Colors.white70 : Colors.grey.shade600),
               ),
             ),
           ],
@@ -438,22 +443,30 @@ class _AddEditBankScreenState extends State<AddEditBankScreen> {
     t,
     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
   );
-  InputDecoration _deco(String hint, IconData icon, Color fill) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
-        prefixIcon: Icon(icon, size: 20, color: Colors.grey.shade500),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+  InputDecoration _deco(String hint, IconData icon, Color fill) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14,
+        color: isDark ? Colors.white38 : Colors.grey.shade400,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 20,
+        color: isDark ? Colors.white54 : Colors.grey.shade500,
+      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
         ),
-        filled: true,
-        fillColor: fill,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 14,
-        ),
-        isDense: true,
-      );
+      ),
+      filled: true,
+      fillColor: fill,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+      isDense: true,
+    );
+  }
 }
