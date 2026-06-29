@@ -95,8 +95,8 @@ class AppSnack {
         onPressed: () => Get.closeCurrentSnackbar(),
         child: Icon(
           Icons.close,
-          size: 16,
           color: isDark ? Colors.white38 : Colors.black26,
+          size: 16,
         ),
         style: TextButton.styleFrom(
           padding: EdgeInsets.zero,

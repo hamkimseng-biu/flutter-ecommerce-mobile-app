@@ -230,7 +230,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     : const Color(0xFFF1F3F5),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : const Color(0xFFD0D0D6),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : const Color(0xFFD0D0D6),
+                    width: 0.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -1490,7 +1506,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   final _firestoreService = FirebaseFirestoreService();
   List<Map<String, dynamic>> _cards = [];
   List<Map<String, dynamic>> _bankAccounts = [];
-  bool _loading = true;
   int _paymentTab = 0; // 0 = Cards, 1 = Bank Accounts
 
   @override
@@ -1506,13 +1521,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       setState(() {
         _cards = cards;
         _bankAccounts = banks;
-        _loading = false;
       });
     } catch (_) {
       setState(() {
         _cards = [];
         _bankAccounts = [];
-        _loading = false;
       });
     }
   }

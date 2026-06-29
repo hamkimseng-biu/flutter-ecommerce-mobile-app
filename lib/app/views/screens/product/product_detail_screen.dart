@@ -31,6 +31,17 @@ class ProductDetailScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: Text('Invalid product')));
     }
 
+    // Pre-selections passed from cart (Map format)
+    final String preSelSize = arg is Map
+        ? (arg['selSize'] as String?) ?? ''
+        : '';
+    final String preSelColor = arg is Map
+        ? (arg['selColor'] as String?) ?? ''
+        : '';
+    final Map<String, String> preSelVariants = arg is Map
+        ? Map<String, String>.from(arg['selVariants'] ?? {})
+        : {};
+
     // Track recently viewed
     final firestoreService = FirebaseFirestoreService();
     Future.microtask(() => firestoreService.addRecentlyViewed(productId));
@@ -53,15 +64,23 @@ class ProductDetailScreen extends StatelessWidget {
       }
 
       final RxString selSize =
-          (product.sizes.isNotEmpty ? product.sizes[0] : 'M').obs;
+          (preSelSize.isNotEmpty && product.sizes.contains(preSelSize)
+                  ? preSelSize
+                  : (product.sizes.isNotEmpty ? product.sizes[0] : 'M'))
+              .obs;
       final RxString selColor =
-          (product.colors.isNotEmpty ? product.colors[0] : '').obs;
+          (preSelColor.isNotEmpty && product.colors.contains(preSelColor)
+                  ? preSelColor
+                  : (product.colors.isNotEmpty ? product.colors[0] : ''))
+              .obs;
       final RxString selMaterial =
           (product.materials.isNotEmpty ? product.materials[0] : '').obs;
       // Reactive selections for custom variant types
       final Map<String, String> customVariantMap = {};
       for (final e in product.customVariants.entries) {
-        if (e.value.isNotEmpty) customVariantMap[e.key] = e.value.first;
+        if (e.value.isNotEmpty) {
+          customVariantMap[e.key] = preSelVariants[e.key] ?? e.value.first;
+        }
       }
       final customVariantSelections = customVariantMap.map(
         (k, v) => MapEntry(k, v.obs),
@@ -730,8 +749,8 @@ class ProductDetailScreen extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              // Detail images first
-                              ...product.detailImages.map(
+                              // Main images first
+                              ...product.images.map(
                                 (url) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Image.network(
@@ -752,8 +771,8 @@ class ProductDetailScreen extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              // All main images (including the first)
-                              ...product.images.map(
+                              // Detail images after
+                              ...product.detailImages.map(
                                 (url) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Image.network(
@@ -847,11 +866,17 @@ class ProductDetailScreen extends StatelessWidget {
                           child: ElevatedButton(
                             onPressed: product.stock > 0
                                 ? () {
+                                    final variants = <String, String>{};
+                                    for (final e
+                                        in customVariantSelections.entries) {
+                                      variants[e.key] = e.value.value;
+                                    }
                                     cc.addToCart(
                                       product,
                                       size: selSize.value,
                                       color: selColor.value,
                                       quantity: qty.value,
+                                      customVariants: variants,
                                     );
                                   }
                                 : null,

@@ -90,320 +90,342 @@ class CartScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                controller: cc.scrollController,
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: grouped.length,
-                itemBuilder: (ctx, idx) {
-                  final sellerId = grouped.keys.elementAt(idx);
-                  final indices = grouped[sellerId]!;
-                  final firstItem = cc.cartItems[indices.first];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          final pc = Get.find<ProductController>();
-                          final seller = pc.getSellerById(sellerId);
-                          if (seller != null) {
-                            Get.toNamed(AppRoutes.shop, arguments: seller);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                          color: isDark
-                              ? AppTheme.darkSurface2
-                              : const Color(0xFFF8F9FB),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.store_outlined,
-                                size: 16,
-                                color: AppTheme.primaryColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Obx(() {
-                                final seller = Get.find<ProductController>()
-                                    .getSellerById(sellerId);
-                                final name =
-                                    seller?.name ?? firstItem.sellerName;
-                                return Text(
-                                  name.isNotEmpty ? name : 'Tiny Chicken',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                );
-                              }),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right,
-                                size: 14,
-                                color: AppTheme.primaryColor,
-                              ),
-                              const Spacer(),
-                              // Shop-level select all
-                              GestureDetector(
-                                onTap: () => cc.toggleShopItems(
-                                  indices.map((i) => cc.cartItems[i]).toList(),
-                                ),
-                                child: Icon(
-                                  indices.every(
-                                        (i) =>
-                                            cc.isItemSelected(cc.cartItems[i]),
-                                      )
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: AppTheme.primaryColor,
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      ...indices.map((i) {
-                        final item = cc.cartItems[i];
-                        return Dismissible(
-                          key: Key(
-                            '${item.productId}_${item.selectedSize}_${item.selectedColor}',
-                          ),
-                          direction: DismissDirection.endToStart,
-                          confirmDismiss: (_) async {
-                            cc.removeFromCart(i);
-                            return true;
+              child: RefreshIndicator(
+                onRefresh: () => cc.refreshCart(),
+                color: AppTheme.primaryColor,
+                child: ListView.builder(
+                  controller: cc.scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 80),
+                  itemCount: grouped.length,
+                  itemBuilder: (ctx, idx) {
+                    final sellerId = grouped.keys.elementAt(idx);
+                    final indices = grouped[sellerId]!;
+                    final firstItem = cc.cartItems[indices.first];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            final pc = Get.find<ProductController>();
+                            final seller = pc.getSellerById(sellerId);
+                            if (seller != null) {
+                              Get.toNamed(AppRoutes.shop, arguments: seller);
+                            }
                           },
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 24),
-                            color: AppTheme.errorColor,
-                            child: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.white,
-                              size: 24,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                            color: isDark
+                                ? AppTheme.darkSurface2
+                                : const Color(0xFFF8F9FB),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.store_outlined,
+                                  size: 16,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                const SizedBox(width: 6),
+                                Obx(() {
+                                  final seller = Get.find<ProductController>()
+                                      .getSellerById(sellerId);
+                                  final name =
+                                      seller?.name ?? firstItem.sellerName;
+                                  return Text(
+                                    name.isNotEmpty ? name : 'Tiny Chicken',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 14,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                const Spacer(),
+                                // Shop-level select all
+                                GestureDetector(
+                                  onTap: () => cc.toggleShopItems(
+                                    indices
+                                        .map((i) => cc.cartItems[i])
+                                        .toList(),
+                                  ),
+                                  child: Icon(
+                                    indices.every(
+                                          (i) => cc.isItemSelected(
+                                            cc.cartItems[i],
+                                          ),
+                                        )
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color: AppTheme.primaryColor,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: GestureDetector(
-                            onTap: () {
-                              final pc = Get.find<ProductController>();
-                              final product = pc.getProductById(item.productId);
-                              if (product != null) {
-                                Get.toNamed(
-                                  AppRoutes.productDetail,
-                                  arguments: product,
-                                );
-                              }
+                        ),
+                        ...indices.map((i) {
+                          final item = cc.cartItems[i];
+                          return Dismissible(
+                            key: Key(
+                              '${item.productId}_${item.selectedSize}_${item.selectedColor}'
+                              '${item.selectedVariants.entries.map((e) => '_${e.key}:${e.value}').join()}',
+                            ),
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (_) async {
+                              cc.removeFromCart(i);
+                              return true;
                             },
-                            child: Container(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                10,
-                                12,
-                                10,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 24),
+                              color: AppTheme.errorColor,
+                              child: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.white,
+                                size: 24,
                               ),
-                              decoration: BoxDecoration(
-                                color: bg,
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: isDark
-                                        ? Colors.white10
-                                        : Colors.grey.shade100,
-                                    width: 0.5,
+                            ),
+                            child: GestureDetector(
+                              onTap: () {
+                                final pc = Get.find<ProductController>();
+                                final product = pc.getProductById(
+                                  item.productId,
+                                );
+                                if (product != null) {
+                                  Get.toNamed(
+                                    AppRoutes.productDetail,
+                                    arguments: {
+                                      'id': product.id,
+                                      'selSize': item.selectedSize,
+                                      'selColor': item.selectedColor,
+                                      'selVariants': item.selectedVariants,
+                                    },
+                                  );
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  10,
+                                  12,
+                                  10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: bg,
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: isDark
+                                          ? Colors.white10
+                                          : Colors.grey.shade100,
+                                      width: 0.5,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => cc.toggleItem(item),
-                                    child: Obx(
-                                      () => Icon(
-                                        cc.isItemSelected(item)
-                                            ? Icons.check_circle
-                                            : Icons.radio_button_unchecked,
-                                        color: cc.isItemSelected(item)
-                                            ? AppTheme.primaryColor
-                                            : Colors.grey.shade300,
-                                        size: 22,
+                                child: Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => cc.toggleItem(item),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Obx(
+                                          () => Icon(
+                                            cc.isItemSelected(item)
+                                                ? Icons.check_circle
+                                                : Icons.radio_button_unchecked,
+                                            color: cc.isItemSelected(item)
+                                                ? AppTheme.primaryColor
+                                                : Colors.grey.shade300,
+                                            size: 22,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      width: 72,
-                                      height: 72,
-                                      color: isDark
-                                          ? AppTheme.darkSurface2
-                                          : const Color(0xFFF1F3F5),
-                                      child: item.image.isNotEmpty
-                                          ? Image.network(
-                                              item.image,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  const Icon(
-                                                    Icons.image,
-                                                    size: 28,
-                                                    color: Colors.grey,
-                                                  ),
-                                            )
-                                          : const Icon(
-                                              Icons.image,
-                                              size: 28,
-                                              color: Colors.grey,
-                                            ),
+                                    const SizedBox(width: 10),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Container(
+                                        width: 72,
+                                        height: 72,
+                                        color: isDark
+                                            ? AppTheme.darkSurface2
+                                            : const Color(0xFFF1F3F5),
+                                        child: item.image.isNotEmpty
+                                            ? Image.network(
+                                                item.image,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Icon(
+                                                      Icons.image,
+                                                      size: 28,
+                                                      color: Colors.grey,
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons.image,
+                                                size: 28,
+                                                color: Colors.grey,
+                                              ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          item.selectedColor.isNotEmpty
-                                              ? '${item.selectedSize} · ${item.selectedColor}'
-                                              : 'Size: ${item.selectedSize}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.white54
-                                                : Colors.grey.shade500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Obx(() {
-                                              final pc =
-                                                  Get.find<ProductController>();
-                                              final currentPrice = pc
-                                                  .getProductById(
-                                                    item.productId,
-                                                  )
-                                                  ?.effectivePrice;
-                                              final updated =
-                                                  currentPrice != null &&
-                                                  (currentPrice - item.price)
-                                                          .abs() >
-                                                      0.01;
-                                              return Row(
-                                                children: [
-                                                  Text(
-                                                    curCtrl.formatPrice(
-                                                      updated
-                                                          ? currentPrice
-                                                          : item.price,
-                                                    ),
-                                                    style: const TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color:
-                                                          AppTheme.primaryColor,
-                                                    ),
-                                                  ),
-                                                  if (updated) ...[
-                                                    const SizedBox(width: 6),
+                                          const SizedBox(height: 3),
+                                          if (item.variantDisplay.isNotEmpty)
+                                            Text(
+                                              item.variantDisplay,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark
+                                                    ? Colors.white54
+                                                    : Colors.grey.shade500,
+                                              ),
+                                            ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              Obx(() {
+                                                final pc =
+                                                    Get.find<
+                                                      ProductController
+                                                    >();
+                                                final currentPrice = pc
+                                                    .getProductById(
+                                                      item.productId,
+                                                    )
+                                                    ?.effectivePrice;
+                                                final updated =
+                                                    currentPrice != null &&
+                                                    (currentPrice - item.price)
+                                                            .abs() >
+                                                        0.01;
+                                                return Row(
+                                                  children: [
                                                     Text(
                                                       curCtrl.formatPrice(
-                                                        item.price,
+                                                        updated
+                                                            ? currentPrice
+                                                            : item.price,
                                                       ),
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: isDark
-                                                            ? Colors.white38
-                                                            : Colors.grey,
-                                                        decoration:
-                                                            TextDecoration
-                                                                .lineThrough,
+                                                      style: const TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: AppTheme
+                                                            .primaryColor,
+                                                      ),
+                                                    ),
+                                                    if (updated) ...[
+                                                      const SizedBox(width: 6),
+                                                      Text(
+                                                        curCtrl.formatPrice(
+                                                          item.price,
+                                                        ),
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: isDark
+                                                              ? Colors.white38
+                                                              : Colors.grey,
+                                                          decoration:
+                                                              TextDecoration
+                                                                  .lineThrough,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                );
+                                              }),
+                                              const Spacer(),
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: Colors.grey.shade200,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    GestureDetector(
+                                                      onTap: () => cc
+                                                          .decrementQuantity(i),
+                                                      child: const Padding(
+                                                        padding: EdgeInsets.all(
+                                                          6,
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.remove,
+                                                          size: 16,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                          ),
+                                                      child: Text(
+                                                        '${item.quantity}',
+                                                        style: const TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    GestureDetector(
+                                                      onTap: () => cc
+                                                          .incrementQuantity(i),
+                                                      child: const Padding(
+                                                        padding: EdgeInsets.all(
+                                                          6,
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.add,
+                                                          size: 16,
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
-                                                ],
-                                              );
-                                            }),
-                                            const Spacer(),
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: Colors.grey.shade200,
                                                 ),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
                                               ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () =>
-                                                        cc.decrementQuantity(i),
-                                                    child: const Padding(
-                                                      padding: EdgeInsets.all(
-                                                        6,
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.remove,
-                                                        size: 16,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 10,
-                                                        ),
-                                                    child: Text(
-                                                      '${item.quantity}',
-                                                      style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  GestureDetector(
-                                                    onTap: () =>
-                                                        cc.incrementQuantity(i),
-                                                    child: const Padding(
-                                                      padding: EdgeInsets.all(
-                                                        6,
-                                                      ),
-                                                      child: Icon(
-                                                        Icons.add,
-                                                        size: 16,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
-                    ],
-                  );
-                },
+                          );
+                        }),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
             // Taobao-style bottom bar — always visible

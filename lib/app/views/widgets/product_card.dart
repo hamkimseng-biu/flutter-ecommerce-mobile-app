@@ -289,7 +289,7 @@ class ProductCard extends StatelessWidget {
   Color _textColorForBg(Color bg) {
     // Compute relative luminance (sRGB)
     final r = bg.r, g = bg.g, b = bg.b;
-    final luma = (0.299 * r + 0.587 * g + 0.114 * b) * bg.opacity;
+    final luma = (0.299 * r + 0.587 * g + 0.114 * b) * bg.a;
     return luma > 0.5 ? Colors.black87 : Colors.white;
   }
 

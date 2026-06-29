@@ -14,6 +14,7 @@ class CartController extends GetxController {
   final RxSet<String> selectedIds = <String>{}.obs;
   final RxString promoCode = ''.obs;
   final RxDouble discount = 0.0.obs;
+  double _promoPercent = 0.0;
   final double taxRate = 0.05;
   final RxDouble _baseShippingFee = 5.99.obs;
 
@@ -29,6 +30,20 @@ class CartController extends GetxController {
     super.onInit();
     _loadShippingFee();
     _loadCartFromFirestore();
+    // Recalculate promo discount whenever cart or selection changes
+    everAll([cartItems, selectedIds], (_) {
+      if (_promoPercent > 0) {
+        discount.value = selectedSubtotal * (_promoPercent / 100.0);
+      }
+    });
+  }
+
+  /// Manually refresh cart data from Firestore (for pull-to-refresh).
+  Future<void> refreshCart() async {
+    try {
+      final items = await _firestoreService.getCartStream().first;
+      cartItems.assignAll(items);
+    } catch (_) {}
   }
 
   Future<void> _loadShippingFee() async {
@@ -103,10 +118,20 @@ class CartController extends GetxController {
       discount.value;
 
   /// Unique key for variant-aware cart storage
-  String _cartKey(String productId, String size, String color) =>
-      '$productId${size.isNotEmpty ? '_$size' : ''}${color.isNotEmpty ? '_$color' : ''}';
-  String _cartKeyFromItem(CartItemModel item) =>
-      _cartKey(item.productId, item.selectedSize, item.selectedColor);
+  String _cartKey(
+    String productId,
+    String size,
+    String color, [
+    Map<String, String>? variants,
+  ]) =>
+      '$productId${size.isNotEmpty ? '_$size' : ''}${color.isNotEmpty ? '_$color' : ''}'
+      '${variants != null && variants.isNotEmpty ? '_${variants.entries.map((e) => '${e.key}:${e.value}').join('_')}' : ''}';
+  String _cartKeyFromItem(CartItemModel item) => _cartKey(
+    item.productId,
+    item.selectedSize,
+    item.selectedColor,
+    item.selectedVariants,
+  );
 
   bool isItemSelected(CartItemModel item) =>
       selectedIds.contains(_cartKeyFromItem(item));
@@ -147,21 +172,27 @@ class CartController extends GetxController {
     String size = 'M',
     String color = '',
     int quantity = 1,
+    Map<String, String>? customVariants,
   }) async {
     final auth = Get.find<AuthController>();
     if (!auth.isLoggedIn.value) {
       auth.requireAuth(message: 'Sign in to add items to your cart.');
       return;
     }
-    final key = _cartKey(product.id, size, color);
+    final key = _cartKey(product.id, size, color, customVariants);
     final existingIdx = cartItems.indexWhere(
       (item) =>
-          _cartKey(item.productId, item.selectedSize, item.selectedColor) ==
+          _cartKey(
+            item.productId,
+            item.selectedSize,
+            item.selectedColor,
+            item.selectedVariants,
+          ) ==
           key,
     );
     if (existingIdx != -1) {
       cartItems[existingIdx].quantity += quantity;
-      cartItems.refresh();
+      cartItems.value = [...cartItems];
       try {
         await _firestoreService.updateCartQuantity(
           key,
@@ -180,6 +211,7 @@ class CartController extends GetxController {
         sellerId: product.sellerId,
         sellerName: product.sellerName,
         freeShipping: product.freeShipping,
+        selectedVariants: customVariants ?? {},
       );
       cartItems.add(item);
       try {
@@ -195,7 +227,12 @@ class CartController extends GetxController {
   Future<void> removeFromCart(int index) async {
     if (index < 0 || index >= cartItems.length) return;
     final item = cartItems[index];
-    final key = _cartKey(item.productId, item.selectedSize, item.selectedColor);
+    final key = _cartKey(
+      item.productId,
+      item.selectedSize,
+      item.selectedColor,
+      item.selectedVariants,
+    );
     selectedIds.remove(key);
     cartItems.removeAt(index);
     try {
@@ -205,11 +242,16 @@ class CartController extends GetxController {
 
   Future<void> incrementQuantity(int index) async {
     cartItems[index].quantity++;
-    cartItems.refresh();
+    cartItems.value = [...cartItems];
     final item = cartItems[index];
     try {
       await _firestoreService.updateCartQuantity(
-        _cartKey(item.productId, item.selectedSize, item.selectedColor),
+        _cartKey(
+          item.productId,
+          item.selectedSize,
+          item.selectedColor,
+          item.selectedVariants,
+        ),
         item.quantity,
       );
     } catch (_) {}
@@ -218,11 +260,16 @@ class CartController extends GetxController {
   Future<void> decrementQuantity(int index) async {
     if (cartItems[index].quantity <= 1) return;
     cartItems[index].quantity--;
-    cartItems.refresh();
+    cartItems.value = [...cartItems];
     final item = cartItems[index];
     try {
       await _firestoreService.updateCartQuantity(
-        _cartKey(item.productId, item.selectedSize, item.selectedColor),
+        _cartKey(
+          item.productId,
+          item.selectedSize,
+          item.selectedColor,
+          item.selectedVariants,
+        ),
         item.quantity,
       );
     } catch (_) {}
@@ -235,22 +282,49 @@ class CartController extends GetxController {
     final promo = await _firestoreService.validatePromoCode(code);
     if (promo != null) {
       promoCode.value = promo['code'] as String;
-      final pct = (promo['discountPercent'] as num).toDouble();
-      discount.value = subtotal * (pct / 100.0);
+      _promoPercent = (promo['discountPercent'] as num).toDouble();
+      discount.value = selectedSubtotal * (_promoPercent / 100.0);
       AppSnack.success(
         'Promo Applied!',
-        '${pct.round()}% discount applied to your order.',
+        '${_promoPercent.round()}% discount applied to your order.',
       );
     } else {
       promoCode.value = '';
+      _promoPercent = 0.0;
       discount.value = 0.0;
       AppSnack.error('Invalid Code', 'Please enter a valid promo code.');
     }
   }
 
+  /// Removes only the currently selected items (after successful checkout).
+  Future<void> removeSelectedItems() async {
+    final toRemove = selectedItems.toList();
+    for (final item in toRemove) {
+      cartItems.remove(item);
+    }
+    selectedIds.clear();
+    promoCode.value = '';
+    _promoPercent = 0.0;
+    discount.value = 0.0;
+    // Delete only purchased items from Firestore using variant-aware keys
+    try {
+      for (final item in toRemove) {
+        final key = _cartKeyFromItem(item);
+        await _firestoreService.removeFromCart(key);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void onClose() {
+    scrollController.dispose();
+    super.onClose();
+  }
+
   Future<void> clearCart() async {
     cartItems.clear();
     promoCode.value = '';
+    _promoPercent = 0.0;
     discount.value = 0.0;
     // Sync to Firestore
     try {

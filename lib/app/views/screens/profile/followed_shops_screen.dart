@@ -129,7 +129,23 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
                     : const Color(0xFFF1F3F5),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : const Color(0xFFD0D0D6),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : const Color(0xFFD0D0D6),
+                    width: 0.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
                 ),
               ),
             ),

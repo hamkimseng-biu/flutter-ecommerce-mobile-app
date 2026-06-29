@@ -374,3 +374,24 @@ See `/memories/repo/ux-flow-rules.md` for UX validation checklist.
 - Shop screen Sort & Filter chip has `InkWell` ripple feedback.
 - Review list uses `AnimatedSwitcher` for filter/sort transitions.
 - **Files**: `profile_sub_screens.dart`, `shop_screen.dart`, `product_detail_screen.dart`
+
+---
+
+## Session Summary — June 29, 2026 (Final Polish)
+
+### Critical Bug Fixes
+- Wishlist deadlock, promo discount selectedSubtotal, stock decrement on order, cart variant-aware keys, removeSelectedItems cleanup
+
+### UI Polish
+- Search box borders on 7+ pages, category chip borders, admin filter borders, sortChip/FilterChip borders
+- Cart pull-to-refresh
+- Product images order: main before detail
+
+### Add/Edit Product Redesign
+- Tabs: pill-shaped TabBar in AppBar.bottom
+- Spacing: 10→16px fields, 20→24px sections
+- Image drag-and-drop: reorder + cross-list move, scroll-aware positioning, 100px unified size
+
+### Cleanup
+- 5 compile warnings removed, deprecated .opacity→.a, child arg ordering
+- 0 errors, 0 warnings in flutter analyze

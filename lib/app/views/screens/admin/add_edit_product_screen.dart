@@ -15,8 +15,11 @@ class AddEditProductScreen extends StatefulWidget {
   State<AddEditProductScreen> createState() => _AddEditProductScreenState();
 }
 
-class _AddEditProductScreenState extends State<AddEditProductScreen> {
+class _AddEditProductScreenState extends State<AddEditProductScreen>
+    with SingleTickerProviderStateMixin {
   final _firestore = FirebaseFirestore.instance;
+
+  late final TabController _tabController;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descCtrl;
@@ -43,7 +46,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   bool _freeShipping = false;
   bool _saving = false;
   bool _isEdit = false;
-  int _activeSection = 0;
   DateTime? _saleEndsAt;
   ProductModel? _existing;
   String _sellerId = '';
@@ -53,6 +55,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     final arg = Get.arguments;
     if (arg is ProductModel) {
       _isEdit = true;
@@ -109,6 +112,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _priceCtrl.dispose();
@@ -288,725 +292,566 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             onPressed: _showPreview,
           ),
         ],
-      ),
-      body: Column(
-        children: [
-          // ── Section tabs ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
+              height: 36,
+              margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.all(4),
-              child: Row(
-                children: [
-                  _segTab(0, Icons.info_outline, 'Info', isDark),
-                  _segTab(1, Icons.image_outlined, 'Images', isDark),
-                  _segTab(2, Icons.tune, 'Options', isDark),
+              padding: const EdgeInsets.all(3),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorWeight: 0,
+                labelColor: Colors.white,
+                unselectedLabelColor: isDark
+                    ? Colors.white38
+                    : Colors.grey.shade600,
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                overlayColor: WidgetStateProperty.all(Colors.transparent),
+                splashFactory: NoSplash.splashFactory,
+                dividerHeight: 0,
+                tabs: const [
+                  Tab(text: 'Info', height: 30, iconMargin: EdgeInsets.zero),
+                  Tab(text: 'Images', height: 30, iconMargin: EdgeInsets.zero),
+                  Tab(text: 'Options', height: 30, iconMargin: EdgeInsets.zero),
                 ],
               ),
             ),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ═══ TAB 0: Info ═══
-                  Offstage(
-                    offstage: _activeSection != 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel('Basic Info'),
-                        const SizedBox(height: 10),
-                        _field(
-                          _nameCtrl,
-                          'Product Name',
-                          Icons.shopping_bag_outlined,
-                          fillColor,
-                        ),
-                        const SizedBox(height: 10),
-                        _field(
-                          _descCtrl,
-                          'Description',
-                          Icons.description_outlined,
-                          fillColor,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 10),
-                        _field(
-                          _priceCtrl,
-                          'Price (\$)',
-                          Icons.attach_money,
-                          fillColor,
-                          keyboardType: TextInputType.number,
-                        ),
-                        const SizedBox(height: 10),
-                        _field(
-                          _discountPctCtrl,
-                          'Discount (%)',
-                          Icons.percent,
-                          fillColor,
-                          keyboardType: TextInputType.number,
-                          hint: 'e.g. 20 = 20% off',
-                        ),
-                        const SizedBox(height: 10),
-                        _categoryDropdown(fillColor),
-                        const SizedBox(height: 20),
-                        _sectionLabel('Stats & Shop'),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _field(
-                                _stockCtrl,
-                                'Stock',
-                                Icons.inventory_2_outlined,
-                                fillColor,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _field(
-                                _soldCountCtrl,
-                                'Sold',
-                                Icons.trending_up,
-                                fillColor,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _field(
-                                _ratingCtrl,
-                                'Rating (0-5)',
-                                Icons.star_half,
-                                fillColor,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _field(
-                                _reviewCountCtrl,
-                                'Reviews',
-                                Icons.rate_review_outlined,
-                                fillColor,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        FutureBuilder<QuerySnapshot>(
-                          future: _firestore
-                              .collection('shops')
-                              .orderBy('name')
-                              .get(),
-                          builder: (ctx, snap) {
-                            final shops = snap.data?.docs ?? [];
-                            if (shops.isEmpty) return const SizedBox.shrink();
-                            String curId = _sellerId.isNotEmpty
-                                ? _sellerId
-                                : (_existing?.sellerId ?? shops.first.id);
-                            final idx = shops.indexWhere((s) => s.id == curId);
-                            final curShop = idx >= 0 ? shops[idx] : shops.first;
-                            return DropdownButtonFormField<String>(
-                              value: curShop.id,
-                              decoration: InputDecoration(
-                                labelText: 'Shop / Seller',
-                                prefixIcon: const Icon(
-                                  Icons.store_outlined,
-                                  size: 20,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: fillColor,
-                                isDense: true,
-                              ),
-                              items: shops.map((s) {
-                                final d = s.data() as Map<String, dynamic>;
-                                return DropdownMenuItem(
-                                  value: s.id,
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        d['avatar'] ?? '🏪',
-                                        style: const TextStyle(fontSize: 16),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        d['name'] ?? 'Shop',
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (v) {
-                                if (v != null) {
-                                  final idx2 = shops.indexWhere(
-                                    (s) => s.id == v,
-                                  );
-                                  if (idx2 < 0) return;
-                                  final s = shops[idx2];
-                                  final d = s.data() as Map<String, dynamic>;
-                                  setState(() {
-                                    _sellerId = v;
-                                    _sellerName = d['name'] ?? 'Tiny Chicken';
-                                    _sellerAvatar =
-                                        d['logoUrl'] ?? d['avatar'] ?? '🏪';
-                                  });
-                                }
-                              },
-                            );
-                          },
-                        ),
-                      ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ═══ TAB 0: Info ═══
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionLabel('Basic Info'),
+                const SizedBox(height: 16),
+                _field(
+                  _nameCtrl,
+                  'Product Name',
+                  Icons.shopping_bag_outlined,
+                  fillColor,
+                ),
+                const SizedBox(height: 16),
+                _field(
+                  _descCtrl,
+                  'Description',
+                  Icons.description_outlined,
+                  fillColor,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                _field(
+                  _priceCtrl,
+                  'Price (\$)',
+                  Icons.attach_money,
+                  fillColor,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                _field(
+                  _discountPctCtrl,
+                  'Discount (%)',
+                  Icons.percent,
+                  fillColor,
+                  keyboardType: TextInputType.number,
+                  hint: 'e.g. 20 = 20% off',
+                ),
+                const SizedBox(height: 16),
+                _categoryDropdown(fillColor),
+                const SizedBox(height: 24),
+                _sectionLabel('Stats & Shop'),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _field(
+                        _stockCtrl,
+                        'Stock',
+                        Icons.inventory_2_outlined,
+                        fillColor,
+                        keyboardType: TextInputType.number,
+                      ),
                     ),
-                  ),
-                  // ═══ TAB 1: Images ═══
-                  Offstage(
-                    offstage: _activeSection != 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Product Images',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Add up to 6 images. First image is the main display.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? Colors.white54
-                                : Colors.grey.shade500,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 130,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount:
-                                _images.length + (_images.length < 6 ? 1 : 0),
-                            itemBuilder: (_, i) {
-                              if (i == _images.length) {
-                                return GestureDetector(
-                                  onTap: _addImageUrl,
-                                  child: Container(
-                                    width: 120,
-                                    height: 120,
-                                    margin: const EdgeInsets.only(right: 10),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: AppTheme.primaryColor.withValues(
-                                          alpha: 0.4,
-                                        ),
-                                        width: 2,
-                                        style: BorderStyle.solid,
-                                      ),
-                                      borderRadius: BorderRadius.circular(14),
-                                      color: AppTheme.primaryColor.withValues(
-                                        alpha: 0.03,
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.add_photo_alternate_outlined,
-                                            color: AppTheme.primaryColor,
-                                            size: 30,
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            'Add Image',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.primaryColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return Stack(
-                                children: [
-                                  Container(
-                                    width: 120,
-                                    height: 120,
-                                    margin: const EdgeInsets.only(right: 10),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(14),
-                                      color: Colors.grey.shade200,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(14),
-                                      child: CachedNetworkImage(
-                                        imageUrl: _images[i],
-                                        fit: BoxFit.cover,
-                                        placeholder: (_, __) => Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.image,
-                                              size: 32,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                        errorWidget: (_, __, ___) => Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.broken_image,
-                                              size: 32,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (i == 0)
-                                    Positioned(
-                                      top: 6,
-                                      left: 6,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryColor,
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Main',
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    top: 6,
-                                    right: 16,
-                                    child: GestureDetector(
-                                      onTap: () =>
-                                          setState(() => _images.removeAt(i)),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.close,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Detail Images',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Extra images shown in description. Not in the main slideshow.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? Colors.white54
-                                : Colors.grey.shade500,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 100,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount:
-                                _detailImages.length +
-                                (_detailImages.length < 8 ? 1 : 0),
-                            itemBuilder: (_, i) {
-                              if (i == _detailImages.length) {
-                                return GestureDetector(
-                                  onTap: _addDetailImageUrl,
-                                  child: Container(
-                                    width: 90,
-                                    height: 90,
-                                    margin: const EdgeInsets.only(right: 10),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: AppTheme.primaryColor.withValues(
-                                          alpha: 0.4,
-                                        ),
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: AppTheme.primaryColor.withValues(
-                                        alpha: 0.03,
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.add_photo_alternate_outlined,
-                                        color: AppTheme.primaryColor,
-                                        size: 24,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return Stack(
-                                children: [
-                                  Container(
-                                    width: 90,
-                                    height: 90,
-                                    margin: const EdgeInsets.only(right: 10),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Colors.grey.shade200,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: CachedNetworkImage(
-                                        imageUrl: _detailImages[i],
-                                        fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.broken_image,
-                                              size: 24,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 14,
-                                    child: GestureDetector(
-                                      onTap: () => setState(
-                                        () => _detailImages.removeAt(i),
-                                      ),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.close,
-                                          size: 12,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _field(
+                        _soldCountCtrl,
+                        'Sold',
+                        Icons.trending_up,
+                        fillColor,
+                        keyboardType: TextInputType.number,
+                      ),
                     ),
-                  ),
-                  // ═══ TAB 2: Options ═══
-                  Offstage(
-                    offstage: _activeSection != 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionLabel('Variants'),
-                        const SizedBox(height: 10),
-                        _buildChipSection(
-                          'Sizes',
-                          _sizes,
-                          'size',
-                          Icons.straighten_outlined,
-                          fillColor,
-                          isDark,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _field(
+                        _ratingCtrl,
+                        'Rating (0-5)',
+                        Icons.star_half,
+                        fillColor,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
-                        const SizedBox(height: 12),
-                        _buildChipSection(
-                          'Materials',
-                          _materials,
-                          'material',
-                          Icons.texture_outlined,
-                          fillColor,
-                          isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _field(
+                        _reviewCountCtrl,
+                        'Reviews',
+                        Icons.rate_review_outlined,
+                        fillColor,
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FutureBuilder<QuerySnapshot>(
+                  future: _firestore.collection('shops').orderBy('name').get(),
+                  builder: (ctx, snap) {
+                    final shops = snap.data?.docs ?? [];
+                    if (shops.isEmpty) return const SizedBox.shrink();
+                    String curId = _sellerId.isNotEmpty
+                        ? _sellerId
+                        : (_existing?.sellerId ?? shops.first.id);
+                    final idx = shops.indexWhere((s) => s.id == curId);
+                    final curShop = idx >= 0 ? shops[idx] : shops.first;
+                    return DropdownButtonFormField<String>(
+                      value: curShop.id,
+                      decoration: InputDecoration(
+                        labelText: 'Shop / Seller',
+                        prefixIcon: const Icon(Icons.store_outlined, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 12),
-                        _buildChipSection(
-                          'Colors',
-                          _colors,
-                          'color',
-                          Icons.palette_outlined,
-                          fillColor,
-                          isDark,
-                        ),
-                        ..._customVariants.entries.map((entry) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: _buildChipSection(
-                              entry.key,
-                              entry.value,
-                              entry.key,
-                              Icons.tune_rounded,
-                              fillColor,
-                              isDark,
-                              onDeleteSection: () => setState(
-                                () => _customVariants.remove(entry.key),
+                        filled: true,
+                        fillColor: fillColor,
+                        isDense: true,
+                      ),
+                      items: shops.map((s) {
+                        final d = s.data() as Map<String, dynamic>;
+                        return DropdownMenuItem(
+                          value: s.id,
+                          child: Row(
+                            children: [
+                              Text(
+                                d['avatar'] ?? '🏪',
+                                style: const TextStyle(fontSize: 16),
                               ),
+                              const SizedBox(width: 8),
+                              Text(
+                                d['name'] ?? 'Shop',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          final idx2 = shops.indexWhere((s) => s.id == v);
+                          if (idx2 < 0) return;
+                          final s = shops[idx2];
+                          final d = s.data() as Map<String, dynamic>;
+                          setState(() {
+                            _sellerId = v;
+                            _sellerName = d['name'] ?? 'Tiny Chicken';
+                            _sellerAvatar = d['logoUrl'] ?? d['avatar'] ?? '🏪';
+                          });
+                        }
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          // ═══ TAB 1: Images ═══
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Product Images',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Add up to 6 images. First image is the main display. Drag to reorder or move between sections.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ImageDragSection(
+                  key: ValueKey('prod_${_images.length}_${_images.hashCode}'),
+                  images: _images,
+                  maxCount: 6,
+                  imageSize: 100,
+                  borderRadius: 14,
+                  sectionLabel: 'product',
+                  isDark: isDark,
+                  onAdd: _addImageUrl,
+                  onRemove: (i) => setState(() => _images.removeAt(i)),
+                  onMove: (url, fromSection, toIndex) {
+                    setState(() {
+                      if (fromSection == 'product') {
+                        final oldIdx = _images.indexOf(url);
+                        if (oldIdx >= 0) {
+                          _images.removeAt(oldIdx);
+                          final insertAt = toIndex > oldIdx
+                              ? toIndex - 1
+                              : toIndex;
+                          _images.insert(
+                            insertAt.clamp(0, _images.length),
+                            url,
+                          );
+                        }
+                      } else {
+                        _detailImages.remove(url);
+                        _images.insert(toIndex.clamp(0, _images.length), url);
+                      }
+                    });
+                  },
+                  onAcceptFromOther: (url) {
+                    setState(() {
+                      _detailImages.remove(url);
+                      _images.add(url);
+                    });
+                  },
+                  childBuilder: (i, url) => _buildProductImageTile(i, url),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Detail Images',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Extra images shown in description. Not in the main slideshow.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ImageDragSection(
+                  key: ValueKey(
+                    'det_${_detailImages.length}_${_detailImages.hashCode}',
+                  ),
+                  images: _detailImages,
+                  maxCount: 8,
+                  imageSize: 100,
+                  borderRadius: 12,
+                  sectionLabel: 'detail',
+                  isDark: isDark,
+                  onAdd: _addDetailImageUrl,
+                  onRemove: (i) => setState(() => _detailImages.removeAt(i)),
+                  onMove: (url, fromSection, toIndex) {
+                    setState(() {
+                      if (fromSection == 'detail') {
+                        final oldIdx = _detailImages.indexOf(url);
+                        if (oldIdx >= 0) {
+                          _detailImages.removeAt(oldIdx);
+                          final insertAt = toIndex > oldIdx
+                              ? toIndex - 1
+                              : toIndex;
+                          _detailImages.insert(
+                            insertAt.clamp(0, _detailImages.length),
+                            url,
+                          );
+                        }
+                      } else {
+                        _images.remove(url);
+                        _detailImages.insert(
+                          toIndex.clamp(0, _detailImages.length),
+                          url,
+                        );
+                      }
+                    });
+                  },
+                  onAcceptFromOther: (url) {
+                    setState(() {
+                      _images.remove(url);
+                      _detailImages.add(url);
+                    });
+                  },
+                  childBuilder: (i, url) => _buildDetailImageTile(i, url),
+                ),
+              ],
+            ),
+          ),
+          // ═══ TAB 2: Options ═══
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionLabel('Variants'),
+                const SizedBox(height: 16),
+                _buildChipSection(
+                  'Sizes',
+                  _sizes,
+                  'size',
+                  Icons.straighten_outlined,
+                  fillColor,
+                  isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildChipSection(
+                  'Materials',
+                  _materials,
+                  'material',
+                  Icons.texture_outlined,
+                  fillColor,
+                  isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildChipSection(
+                  'Colors',
+                  _colors,
+                  'color',
+                  Icons.palette_outlined,
+                  fillColor,
+                  isDark,
+                ),
+                ..._customVariants.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _buildChipSection(
+                      entry.key,
+                      entry.value,
+                      entry.key,
+                      Icons.tune_rounded,
+                      fillColor,
+                      isDark,
+                      onDeleteSection: () =>
+                          setState(() => _customVariants.remove(entry.key)),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 12),
+                _buildAddVariantType(fillColor, isDark),
+                const SizedBox(height: 24),
+                _sectionLabel('Settings'),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Featured Product',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Shown on home page featured section',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: _isFeatured,
+                  onChanged: (v) => setState(() => _isFeatured = v),
+                  activeColor: AppTheme.primaryColor,
+                  dense: true,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Flash Sale',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Shown in flash sale with countdown',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: _isFlashSale,
+                  onChanged: (v) => setState(() => _isFlashSale = v),
+                  activeColor: AppTheme.flashSaleColor,
+                  dense: true,
+                ),
+                if (_isFlashSale) ...[
+                  const SizedBox(height: 8),
+                  _field(
+                    _flashDiscountCtrl,
+                    'Flash Discount (%)',
+                    Icons.bolt,
+                    fillColor,
+                    keyboardType: TextInputType.number,
+                    hint: 'e.g. 30 = 30% off',
+                  ),
+                  const SizedBox(height: 8),
+                  // Sale end date picker
+                  InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate:
+                            _saleEndsAt ??
+                            DateTime.now().add(const Duration(days: 7)),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(
+                            _saleEndsAt ??
+                                DateTime.now().add(
+                                  const Duration(hours: 23, minutes: 59),
+                                ),
+                          ),
+                        );
+                        if (time != null) {
+                          setState(
+                            () => _saleEndsAt = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
                             ),
                           );
-                        }),
-                        const SizedBox(height: 12),
-                        _buildAddVariantType(fillColor, isDark),
-                        const SizedBox(height: 20),
-                        _sectionLabel('Settings'),
-                        const SizedBox(height: 10),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Featured Product',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          subtitle: const Text(
-                            'Shown on home page featured section',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          value: _isFeatured,
-                          onChanged: (v) => setState(() => _isFeatured = v),
-                          activeColor: AppTheme.primaryColor,
-                          dense: true,
+                        } else {
+                          setState(() => _saleEndsAt = date);
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isDark ? Colors.white24 : Colors.grey.shade300,
                         ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Flash Sale',
-                            style: TextStyle(fontSize: 14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.timer_outlined,
+                            size: 20,
+                            color: AppTheme.flashSaleColor,
                           ),
-                          subtitle: const Text(
-                            'Shown in flash sale with countdown',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          value: _isFlashSale,
-                          onChanged: (v) => setState(() => _isFlashSale = v),
-                          activeColor: AppTheme.flashSaleColor,
-                          dense: true,
-                        ),
-                        if (_isFlashSale) ...[
-                          const SizedBox(height: 8),
-                          _field(
-                            _flashDiscountCtrl,
-                            'Flash Discount (%)',
-                            Icons.bolt,
-                            fillColor,
-                            keyboardType: TextInputType.number,
-                            hint: 'e.g. 30 = 30% off',
-                          ),
-                          const SizedBox(height: 8),
-                          // Sale end date picker
-                          InkWell(
-                            onTap: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate:
-                                    _saleEndsAt ??
-                                    DateTime.now().add(const Duration(days: 7)),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(
-                                  const Duration(days: 365),
-                                ),
-                              );
-                              if (date != null) {
-                                final time = await showTimePicker(
-                                  context: context,
-                                  initialTime: TimeOfDay.fromDateTime(
-                                    _saleEndsAt ??
-                                        DateTime.now().add(
-                                          const Duration(
-                                            hours: 23,
-                                            minutes: 59,
-                                          ),
-                                        ),
-                                  ),
-                                );
-                                if (time != null) {
-                                  setState(
-                                    () => _saleEndsAt = DateTime(
-                                      date.year,
-                                      date.month,
-                                      date.day,
-                                      time.hour,
-                                      time.minute,
-                                    ),
-                                  );
-                                } else {
-                                  setState(() => _saleEndsAt = date);
-                                }
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.white24
-                                      : Colors.grey.shade300,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.timer_outlined,
-                                    size: 20,
-                                    color: AppTheme.flashSaleColor,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _saleEndsAt != null
-                                          ? 'Ends: ${_saleEndsAt!.day}/${_saleEndsAt!.month}/${_saleEndsAt!.year} at ${_saleEndsAt!.hour.toString().padLeft(2, '0')}:${_saleEndsAt!.minute.toString().padLeft(2, '0')}'
-                                          : 'Set sale end date & time (optional)',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: _saleEndsAt != null
-                                            ? null
-                                            : (isDark
-                                                  ? Colors.white54
-                                                  : Colors.grey),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_saleEndsAt != null)
-                                    GestureDetector(
-                                      onTap: () =>
-                                          setState(() => _saleEndsAt = null),
-                                      child: const Icon(
-                                        Icons.close,
-                                        size: 18,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _saleEndsAt != null
+                                  ? 'Ends: ${_saleEndsAt!.day}/${_saleEndsAt!.month}/${_saleEndsAt!.year} at ${_saleEndsAt!.hour.toString().padLeft(2, '0')}:${_saleEndsAt!.minute.toString().padLeft(2, '0')}'
+                                  : 'Set sale end date & time (optional)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _saleEndsAt != null
+                                    ? null
+                                    : (isDark ? Colors.white54 : Colors.grey),
                               ),
                             ),
                           ),
+                          if (_saleEndsAt != null)
+                            GestureDetector(
+                              onTap: () => setState(() => _saleEndsAt = null),
+                              child: const Icon(
+                                Icons.close,
+                                size: 18,
+                                color: Colors.grey,
+                              ),
+                            ),
                         ],
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Free Shipping',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          subtitle: const Text(
-                            'Customer pays no shipping for this product',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                          value: _freeShipping,
-                          onChanged: (v) => setState(() => _freeShipping = v),
-                          activeColor: AppTheme.primaryColor,
-                          dense: true,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: const Text(
-                            'Badge Visibility',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Show Sold Count',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          value: _showSoldCount,
-                          onChanged: (v) => setState(() => _showSoldCount = v),
-                          activeColor: AppTheme.primaryColor,
-                          dense: true,
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Show Rating Stars',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          value: _showRating,
-                          onChanged: (v) => setState(() => _showRating = v),
-                          activeColor: AppTheme.primaryColor,
-                          dense: true,
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Show Review Count',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          value: _showReviewCount,
-                          onChanged: (v) =>
-                              setState(() => _showReviewCount = v),
-                          activeColor: AppTheme.primaryColor,
-                          dense: true,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
-              ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Free Shipping',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Customer pays no shipping for this product',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: _freeShipping,
+                  onChanged: (v) => setState(() => _freeShipping = v),
+                  activeColor: AppTheme.primaryColor,
+                  dense: true,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: const Text(
+                    'Badge Visibility',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Show Sold Count',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  value: _showSoldCount,
+                  onChanged: (v) => setState(() => _showSoldCount = v),
+                  activeColor: AppTheme.primaryColor,
+                  dense: true,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Show Rating Stars',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  value: _showRating,
+                  onChanged: (v) => setState(() => _showRating = v),
+                  activeColor: AppTheme.primaryColor,
+                  dense: true,
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Show Review Count',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  value: _showReviewCount,
+                  onChanged: (v) => setState(() => _showReviewCount = v),
+                  activeColor: AppTheme.primaryColor,
+                  dense: true,
+                ),
+              ],
             ),
           ),
         ],
@@ -1062,52 +907,130 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     );
   }
 
-  Widget _segTab(int index, IconData icon, String label, bool isDark) {
-    final active = _activeSection == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _activeSection = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            color: active ? AppTheme.primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+  Widget _buildProductImageTile(int i, String url) {
+    return SizedBox(
+      width: 100,
+      height: 100,
+      child: Stack(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.grey.shade200,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(Icons.image, size: 28, color: Colors.grey),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      size: 32,
+                      color: Colors.grey,
                     ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 17,
-                color: active
-                    ? Colors.white
-                    : (isDark ? Colors.white54 : Colors.grey.shade600),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: active
-                      ? Colors.white
-                      : (isDark ? Colors.white54 : Colors.grey.shade600),
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          if (i == 0)
+            Positioned(
+              top: 6,
+              left: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Main',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: GestureDetector(
+              onTap: () => setState(() => _images.removeAt(i)),
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailImageTile(int i, String url) {
+    return SizedBox(
+      width: 100,
+      height: 100,
+      child: Stack(
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey.shade200,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      size: 24,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: () => setState(() => _detailImages.removeAt(i)),
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 12, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1493,6 +1416,251 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           onChanged: (v) {
             if (v != null) _categoryCtrl.text = v;
           },
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAGGABLE IMAGE SECTION — supports reorder & cross-list drag
+// ═══════════════════════════════════════════════════════════════
+
+class _ImageDragSection extends StatefulWidget {
+  final List<String> images;
+  final int maxCount;
+  final double imageSize;
+  final double borderRadius;
+  final String sectionLabel;
+  final bool isDark;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  final void Function(String url, String fromSection, int toIndex) onMove;
+  final void Function(String url) onAcceptFromOther;
+  final Widget Function(int index, String url) childBuilder;
+
+  const _ImageDragSection({
+    super.key,
+    required this.images,
+    required this.maxCount,
+    required this.imageSize,
+    required this.borderRadius,
+    required this.sectionLabel,
+    required this.isDark,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onMove,
+    required this.onAcceptFromOther,
+    required this.childBuilder,
+  });
+
+  @override
+  State<_ImageDragSection> createState() => _ImageDragSectionState();
+}
+
+class _ImageDragSectionState extends State<_ImageDragSection> {
+  int? _hoverIndex;
+  bool _isDragOver = false;
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Calculate insertion index from a local x coordinate.
+  int _indexAt(double localX) {
+    final w = widget;
+    final slotWidth = w.imageSize + 10;
+    final idx = (localX / slotWidth).round();
+    return idx.clamp(0, w.images.length);
+  }
+
+  void _onDragStarted(int draggedIdx) {
+    setState(() {
+      _isDragOver = true;
+      _hoverIndex = draggedIdx + 1;
+    });
+  }
+
+  void _onDragEnded() {
+    setState(() {
+      _isDragOver = false;
+      _hoverIndex = null;
+    });
+  }
+
+  void _acceptDrop(String data) {
+    final w = widget;
+    final parts = data.split('|');
+    if (parts.length != 2) return;
+    final url = parts[0];
+    final fromSection = parts[1];
+    final toIdx = (_hoverIndex ?? w.images.length).clamp(0, w.images.length);
+    _onDragEnded();
+    if (fromSection == w.sectionLabel) {
+      final oldIdx = w.images.indexOf(url);
+      if (oldIdx >= 0 && oldIdx != toIdx) {
+        final adjusted = (toIdx > oldIdx) ? toIdx - 1 : toIdx;
+        w.onMove(url, fromSection, adjusted);
+      }
+    } else {
+      if (w.images.length < w.maxCount) {
+        w.onMove(url, fromSection, toIdx);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final w = widget;
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (_) {
+        if (!_isDragOver) setState(() => _isDragOver = true);
+        return true;
+      },
+      onLeave: (_) {
+        // Keep _hoverIndex — don't reset it on leave, only on drag end
+        setState(() => _isDragOver = false);
+      },
+      onMove: (details) {
+        final box = context.findRenderObject() as RenderBox;
+        final localX =
+            box.globalToLocal(details.offset).dx + _scrollCtrl.offset;
+        setState(() {
+          _isDragOver = true;
+          _hoverIndex = _indexAt(localX);
+        });
+      },
+      onAcceptWithDetails: (details) => _acceptDrop(details.data),
+      builder: (ctx, candidateData, rejectedData) {
+        final showIndicator = _isDragOver && candidateData.isNotEmpty;
+        return SizedBox(
+          height: w.imageSize + 10,
+          child: SingleChildScrollView(
+            controller: _scrollCtrl,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ...List.generate(w.images.length, (i) {
+                  final url = w.images[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: LongPressDraggable<String>(
+                      delay: const Duration(milliseconds: 200),
+                      data: '$url|${w.sectionLabel}',
+                      onDragStarted: () => _onDragStarted(i),
+                      onDragEnd: (_) => _onDragEnded(),
+                      feedback: Material(
+                        elevation: 6,
+                        borderRadius: BorderRadius.circular(w.borderRadius),
+                        child: SizedBox(
+                          width: w.imageSize,
+                          height: w.imageSize,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(w.borderRadius),
+                            child: CachedNetworkImage(
+                              imageUrl: url,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                      childWhenDragging: Opacity(
+                        opacity: 0.3,
+                        child: w.childBuilder(i, url),
+                      ),
+                      child: Stack(
+                        children: [
+                          w.childBuilder(i, url),
+                          // Drop indicator overlay
+                          if (showIndicator && _hoverIndex == i)
+                            Positioned(
+                              left: -3,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 6,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor,
+                                  borderRadius: BorderRadius.circular(3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.primaryColor.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                // Indicator at end
+                if (showIndicator && _hoverIndex == w.images.length)
+                  Container(
+                    width: 6,
+                    height: w.imageSize,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                // Add button
+                if (w.images.length < w.maxCount)
+                  GestureDetector(
+                    onTap: w.onAdd,
+                    child: Container(
+                      width: w.imageSize,
+                      height: w.imageSize,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                          width: 2,
+                          style: BorderStyle.solid,
+                        ),
+                        borderRadius: BorderRadius.circular(w.borderRadius),
+                        color: AppTheme.primaryColor.withValues(alpha: 0.03),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.add_photo_alternate_outlined,
+                              color: AppTheme.primaryColor,
+                              size: 26,
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Add',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
       },
     );

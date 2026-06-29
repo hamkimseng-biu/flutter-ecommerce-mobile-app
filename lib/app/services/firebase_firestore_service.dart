@@ -354,14 +354,32 @@ class FirebaseFirestoreService {
     if (_uid.isNotEmpty) {
       data['userId'] = _uid;
       final docRef = await _ordersRef.add(data);
+      await _decrementStock(items);
       return docRef.id;
     } else {
       // Guest order — store in guest_orders collection
       if (guestName != null) data['guestName'] = guestName;
       if (guestEmail != null) data['guestEmail'] = guestEmail;
       final docRef = await _firestore.collection('guest_orders').add(data);
+      await _decrementStock(items);
       return docRef.id;
     }
+  }
+
+  /// Atomically decrement stock for each purchased item using a batch write.
+  Future<void> _decrementStock(List<Map<String, dynamic>> items) async {
+    final batch = _firestore.batch();
+    for (final item in items) {
+      final productId = item['productId'] as String?;
+      final quantity = item['quantity'] as int?;
+      if (productId == null || quantity == null || quantity <= 0) continue;
+      batch.update(_firestore.collection('products').doc(productId), {
+        'stock': FieldValue.increment(-quantity),
+      });
+    }
+    try {
+      await batch.commit();
+    } catch (_) {}
   }
 
   // Get all user orders

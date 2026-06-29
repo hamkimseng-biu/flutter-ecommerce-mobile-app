@@ -198,7 +198,12 @@ class _SearchScreenState extends State<SearchScreen> {
                               backgroundColor: isDark
                                   ? AppTheme.darkSurface2
                                   : const Color(0xFFF1F3F5),
-                              side: BorderSide.none,
+                              side: BorderSide(
+                                color: isDark
+                                    ? Colors.white24
+                                    : const Color(0xFFD0D0D6),
+                                width: 0.5,
+                              ),
                               visualDensity: VisualDensity.compact,
                               materialTapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,

@@ -218,16 +218,6 @@ class ProductController extends GetxController {
     }
   }
 
-  void _loadMockData() {
-    allProducts.value = MockDataService.getProducts();
-    filteredProducts.value = allProducts;
-    categories.value = MockDataService.getCategories();
-    featuredProducts.value = MockDataService.getFeaturedProducts();
-    newArrivals.value = MockDataService.getNewArrivals();
-    trendingProducts.value = MockDataService.getTrendingProducts();
-    flashSaleProducts.value = MockDataService.getFlashSaleProducts();
-  }
-
   void selectCategory(int index) {
     selectedCategoryIndex.value = index;
     filteredProducts.value = index == 0

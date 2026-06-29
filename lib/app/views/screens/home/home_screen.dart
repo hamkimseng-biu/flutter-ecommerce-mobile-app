@@ -201,7 +201,12 @@ class HomeScreen extends StatelessWidget {
                                 color: AppTheme.primaryColor,
                                 width: 1.5,
                               )
-                            : null,
+                            : Border.all(
+                                color: isDark
+                                    ? Colors.white10
+                                    : const Color(0xFFE0E0E0),
+                                width: 0.5,
+                              ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

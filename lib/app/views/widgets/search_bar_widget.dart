@@ -23,7 +23,7 @@ class SearchBarWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF2A2A3A) : const Color(0xFFF1F3F5);
-    final borderColor = isDark ? Colors.white12 : const Color(0xFFE0E0E0);
+    final borderColor = isDark ? Colors.white24 : const Color(0xFFD0D0D6);
 
     final textField = TextField(
       enabled: enabled,
@@ -56,7 +56,7 @@ class SearchBarWidget extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: borderColor, width: 0.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
@@ -67,7 +67,10 @@ class SearchBarWidget extends StatelessWidget {
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: borderColor.withValues(alpha: 0.5),
+            width: 0.5,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
       ),

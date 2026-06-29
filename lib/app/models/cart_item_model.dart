@@ -11,6 +11,7 @@ class CartItemModel {
   String sellerId;
   String sellerName;
   bool freeShipping;
+  Map<String, String> selectedVariants;
 
   CartItemModel({
     required this.productId,
@@ -23,9 +24,21 @@ class CartItemModel {
     this.sellerId = '',
     this.sellerName = '',
     this.freeShipping = false,
+    this.selectedVariants = const {},
   });
 
   double get totalPrice => price * quantity;
+
+  /// Unified variant display: size · color · custom variants
+  String get variantDisplay {
+    final parts = <String>[];
+    if (selectedSize.isNotEmpty) parts.add(selectedSize);
+    if (selectedColor.isNotEmpty) parts.add(selectedColor);
+    for (final e in selectedVariants.entries) {
+      parts.add('${e.key}: ${e.value}');
+    }
+    return parts.join(' · ');
+  }
 
   // ── Firestore ──
 
@@ -42,6 +55,9 @@ class CartItemModel {
       sellerId: data['sellerId'] ?? '',
       sellerName: data['sellerName'] ?? '',
       freeShipping: data['freeShipping'] ?? false,
+      selectedVariants: data['selectedVariants'] is Map
+          ? Map<String, String>.from(data['selectedVariants'])
+          : {},
     );
   }
 
@@ -57,6 +73,7 @@ class CartItemModel {
       'sellerId': sellerId,
       'sellerName': sellerName,
       'freeShipping': freeShipping,
+      'selectedVariants': selectedVariants,
     };
   }
 }

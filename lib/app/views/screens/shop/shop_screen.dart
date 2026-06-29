@@ -187,7 +187,7 @@ class _ShopScreenState extends State<ShopScreen> {
             color: dark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: dark ? Colors.white10 : const Color(0xFFE0E0E0),
+              color: dark ? Colors.white24 : const Color(0xFFD0D0D6),
             ),
           ),
           child: const Row(

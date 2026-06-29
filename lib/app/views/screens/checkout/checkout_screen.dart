@@ -78,6 +78,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final addrs = await _firestoreService.getAddresses();
       if (addrs.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           _addresses = addrs;
           _selectedAddress = addrs.firstWhere(
@@ -338,6 +339,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'size': item.selectedSize,
               'color': item.selectedColor,
               'productId': item.productId,
+              'selectedVariants': item.selectedVariants,
             },
           )
           .toList();
@@ -407,7 +409,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  cc.clearCart();
+                  cc.removeSelectedItems();
                   Get.offAllNamed(AppRoutes.main);
                 },
                 child: const Text('Back to Home'),
@@ -426,6 +428,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _guestName.dispose();
+    _guestEmail.dispose();
+    _guestAddress.dispose();
+    super.dispose();
+  }
+
+  // ── UI ──
   @override
   Widget build(BuildContext context) {
     final cc = Get.find<CartController>();
@@ -760,7 +771,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ),
                                     ),
                                     Text(
-                                      'Qty: ${item.quantity} | ${item.selectedSize}',
+                                      'Qty: ${item.quantity} | ${item.variantDisplay}',
                                       style: const TextStyle(
                                         fontSize: 10,
                                         color: Color(0xFF9E9EAA),

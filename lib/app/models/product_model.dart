@@ -187,7 +187,10 @@ class ProductModel {
       flashSalePrice: (data['flashSalePrice'] ?? 0).toDouble(),
       saleEndsAt: (data['saleEndsAt'] as Timestamp?)?.toDate(),
       isFeatured: data['isFeatured'] ?? false,
-      discountPercent: (data['discountPercent'] ?? 0).toDouble(),
+      discountPercent: ((data['discountPercent'] ?? 0) as num).toDouble().clamp(
+        0.0,
+        100.0,
+      ),
       showSoldCount: data['showSoldCount'] ?? true,
       showRating: data['showRating'] ?? true,
       showReviewCount: data['showReviewCount'] ?? true,

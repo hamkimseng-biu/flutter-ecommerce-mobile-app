@@ -322,6 +322,20 @@ class OrderDetailScreen extends StatelessWidget {
                     final price = (item['price'] ?? 0.0).toDouble();
                     final image = item['image'] as String? ?? '';
                     final productId = (item['productId'] as String?) ?? '';
+                    final itemSize = item['size'] as String? ?? '';
+                    final itemColor = item['color'] as String? ?? '';
+                    final itemVariants = item['selectedVariants'] is Map
+                        ? Map<String, String>.from(item['selectedVariants'])
+                        : <String, String>{};
+
+                    // Build variant display
+                    final parts = <String>[];
+                    if (itemSize.isNotEmpty) parts.add(itemSize);
+                    if (itemColor.isNotEmpty) parts.add(itemColor);
+                    for (final e in itemVariants.entries) {
+                      parts.add('${e.key}: ${e.value}');
+                    }
+                    final variantText = parts.join(' · ');
 
                     // Live image fallback
                     String displayImage = image;
@@ -384,14 +398,29 @@ class OrderDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (variantText.isNotEmpty)
+                                    Text(
+                                      variantText,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.white54
+                                            : Colors.grey.shade500,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 8),

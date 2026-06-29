@@ -53,8 +53,11 @@ class WishlistController extends GetxController {
         } catch (_) {}
       }
       wishlistItems.assignAll(products);
-    } catch (_) {}
-    _loading = false;
+    } catch (_) {
+      // Swallow but ensure _loading resets
+    } finally {
+      _loading = false;
+    }
   }
 
   bool isInWishlist(String productId) {

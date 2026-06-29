@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../services/firebase_firestore_service.dart';
-import '../../../services/firebase_storage_service.dart';
 import '../../../services/seed_data.dart';
 import '../../../models/product_model.dart';
 import '../../../../../config/app_theme.dart';
@@ -23,7 +22,6 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     with SingleTickerProviderStateMixin {
   final _firestore = FirebaseFirestore.instance;
   final _firestoreService = FirebaseFirestoreService();
-  final _storageService = FirebaseStorageService();
   List<ProductModel> _products = [];
   List<String> _categoryNames = [];
   bool _loading = true;
@@ -338,8 +336,6 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           future: _loadAdminEmails(),
           builder: (ctx, snap) {
             final emails = snap.data ?? [];
-            final addCtrl = TextEditingController();
-
             return Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -429,6 +425,26 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? Colors.white24
+                                    : const Color(0xFFD0D0D6),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color: isDark
+                                    ? Colors.white24
+                                    : const Color(0xFFD0D0D6),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: AppTheme.primaryColor,
+                                width: 1.5,
+                              ),
                             ),
                             filled: true,
                             fillColor: isDark
@@ -933,7 +949,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                           : const Color(0xFFF1F3F5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : const Color(0xFFD0D0D6),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : const Color(0xFFD0D0D6),
+                          width: 0.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryColor,
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
@@ -952,6 +988,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                           ? AppTheme.darkSurface2
                           : const Color(0xFFF1F3F5),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFD0D0D6),
+                        width: 0.5,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1249,7 +1291,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                           : const Color(0xFFF1F3F5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : const Color(0xFFD0D0D6),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white24
+                              : const Color(0xFFD0D0D6),
+                          width: 0.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryColor,
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
@@ -1267,6 +1329,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                         ? AppTheme.darkSurface2
                         : const Color(0xFFF1F3F5),
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark ? Colors.white24 : const Color(0xFFD0D0D6),
+                      width: 0.5,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1798,7 +1864,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                         : const Color(0xFFF1F3F5),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFD0D0D6),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFD0D0D6),
+                        width: 0.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primaryColor,
+                        width: 1.5,
+                      ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -2101,7 +2187,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                         : const Color(0xFFF1F3F5),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFD0D0D6),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? Colors.white24
+                            : const Color(0xFFD0D0D6),
+                        width: 0.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppTheme.primaryColor,
+                        width: 1.5,
+                      ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -2286,6 +2392,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final nameCtrl = TextEditingController(text: category?['name'] ?? '');
     final iconCtrl = TextEditingController(text: category?['icon'] ?? '');
     final isEdit = category != null;
+    final isDark = Get.isDarkMode;
 
     Get.dialog(
       AlertDialog(
@@ -2296,19 +2403,57 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           children: [
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Category Name',
                 hintText: 'e.g. Clothing, Electronics',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    width: 0.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: iconCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Icon (emoji)',
                 hintText: 'e.g. 👕, 📱, 🏠',
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    width: 0.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 1.5,
+                  ),
+                ),
               ),
             ),
           ],
