@@ -14,6 +14,7 @@ import 'app/controllers/theme_controller.dart';
 import 'app/controllers/home_controller.dart';
 import 'app/routes/app_routes.dart';
 import 'app/services/fcm_service.dart';
+import 'app/services/time_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,9 @@ void main() async {
   // Init FCM (push notifications) — non-blocking
   FcmService().initialize();
 
+  // Sync clock with Firestore server time — non-blocking
+  TimeService().sync();
+
   // ThemeController must be initialized before runApp since
   // TinyChickenApp.build() calls Get.find<ThemeController>()
   Get.put(ThemeController(), permanent: true);
@@ -43,23 +47,28 @@ class TinyChickenApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
-      locale: const Locale('en'),
-      supportedLocales: const [Locale('en'), Locale('km')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      initialRoute: AppRoutes.splash,
-      getPages: AppRoutes.pages,
-      initialBinding: InitialBindings(),
-      defaultTransition: Transition.fadeIn,
+    final themeCtrl = Get.find<ThemeController>();
+    return Obx(
+      () => GetMaterialApp(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeCtrl.isDarkMode.value
+            ? ThemeMode.dark
+            : ThemeMode.light,
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('km')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        initialRoute: AppRoutes.splash,
+        getPages: AppRoutes.pages,
+        initialBinding: InitialBindings(),
+        defaultTransition: Transition.fadeIn,
+      ),
     );
   }
 }

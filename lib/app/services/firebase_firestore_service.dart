@@ -831,8 +831,14 @@ class FirebaseFirestoreService {
       final doc = await _followedShopsRef.doc(shopId).get();
       if (doc.exists) {
         await _followedShopsRef.doc(shopId).delete();
-        await _firestore.collection('shops').doc(shopId).update({
-          'followerCount': FieldValue.increment(-1),
+        // Use a transaction to prevent followerCount from going below 0
+        await _firestore.runTransaction((txn) async {
+          final shopRef = _firestore.collection('shops').doc(shopId);
+          final shopDoc = await txn.get(shopRef);
+          final current = (shopDoc.data()?['followerCount'] ?? 0) as int;
+          if (current > 0) {
+            txn.update(shopRef, {'followerCount': current - 1});
+          }
         });
       } else {
         await _followedShopsRef.doc(shopId).set({

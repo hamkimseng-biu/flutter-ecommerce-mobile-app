@@ -175,31 +175,36 @@ class _ShopScreenState extends State<ShopScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = Theme.of(context).cardColor;
 
-    Widget sortChip(BuildContext ctx, bool dark) => GestureDetector(
-      onTap: _showSortSheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: dark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: dark ? Colors.white10 : const Color(0xFFE0E0E0),
-          ),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.sort_rounded, size: 16, color: AppTheme.primaryColor),
-            SizedBox(width: 4),
-            Text(
-              'Sort & Filter',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryColor,
-              ),
+    Widget sortChip(BuildContext ctx, bool dark) => Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: _showSortSheet,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: dark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: dark ? Colors.white10 : const Color(0xFFE0E0E0),
             ),
-          ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sort_rounded, size: 16, color: AppTheme.primaryColor),
+              SizedBox(width: 4),
+              Text(
+                'Sort & Filter',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

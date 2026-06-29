@@ -12,7 +12,7 @@ class WishlistController extends GetxController {
 
   final RxList<ProductModel> wishlistItems = <ProductModel>[].obs;
   final ScrollController scrollController = ScrollController();
-  bool _initialized = false;
+  bool _loading = false;
 
   void scrollToTop() {
     if (scrollController.hasClients) {
@@ -30,14 +30,19 @@ class WishlistController extends GetxController {
     super.onClose();
   }
 
-  /// Load wishlist from Firestore and fetch full product data
+  /// Load wishlist from Firestore and fetch full product data.
+  /// Re-fetches on every call so discount/price changes are reflected.
+  /// Guarded against re-entrant calls from repeated widget rebuilds.
   Future<void> loadWishlist() async {
-    if (_initialized) return;
-    _initialized = true;
+    if (_loading) return;
+    _loading = true;
     try {
       final ids = await _firestoreService.getWishlistIds();
-      if (ids.isEmpty) return;
-      // Fetch products in batches
+      if (ids.isEmpty) {
+        wishlistItems.clear();
+        return;
+      }
+      // Fetch products fresh from Firestore
       final products = <ProductModel>[];
       for (final id in ids) {
         try {
@@ -49,6 +54,7 @@ class WishlistController extends GetxController {
       }
       wishlistItems.assignAll(products);
     } catch (_) {}
+    _loading = false;
   }
 
   bool isInWishlist(String productId) {

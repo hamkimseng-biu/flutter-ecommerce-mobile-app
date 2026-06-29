@@ -186,7 +186,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   errorBuilder: (_, __, ___) => ClipRRect(
                                     borderRadius: BorderRadius.circular(30),
                                     child: Image.asset(
-                                      'assets/images/icon.png',
+                                      'assets/logo/Chicken Logo.png',
                                       width: 100,
                                       height: 100,
                                       fit: BoxFit.cover,
@@ -197,7 +197,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             : ClipRRect(
                                 borderRadius: BorderRadius.circular(30),
                                 child: Image.asset(
-                                  'assets/images/icon.png',
+                                  'assets/logo/Chicken Logo.png',
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,

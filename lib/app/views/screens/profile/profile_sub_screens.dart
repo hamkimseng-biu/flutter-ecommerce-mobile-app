@@ -11,6 +11,7 @@ import '../../../services/fcm_service.dart';
 import '../../../controllers/theme_controller.dart';
 import '../../../controllers/currency_controller.dart';
 import '../../../controllers/product_controller.dart';
+import '../../../controllers/auth_controller.dart';
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                        ORDERS SCREEN                         ║
@@ -23,100 +24,47 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
+  final TextEditingController _searchCtrl = TextEditingController();
   int _activeTab = 0;
   final _tabs = [
     'All',
     'Processing',
-    'Shipping',
-    'On Delivery',
+    'In Transit',
     'Delivered',
     'Return Requested',
     'Cancelled',
     'To Review',
   ];
 
-  final List<Map<String, dynamic>> _mockOrders = [
-    {
-      'id': '#TC-2024001',
-      'date': 'June 5, 2026',
-      'status': 'Delivered',
-      'items': [
-        {
-          'name': 'Slim Fit T-Shirt',
-          'image': 'https://picsum.photos/seed/tshirt1/200/200',
-          'qty': 2,
-          'price': 24.99,
-        },
-        {
-          'name': 'Denim Jacket',
-          'image': 'https://picsum.photos/seed/jacket1/200/200',
-          'qty': 1,
-          'price': 74.99,
-        },
-      ],
-      'total': 124.97,
-    },
-    {
-      'id': '#TC-2024002',
-      'date': 'June 7, 2026',
-      'status': 'Shipping',
-      'items': [
-        {
-          'name': 'Running Sneakers',
-          'image': 'https://picsum.photos/seed/sneaker1/200/200',
-          'qty': 1,
-          'price': 49.99,
-        },
-      ],
-      'total': 49.99,
-    },
-    {
-      'id': '#TC-2024003',
-      'date': 'June 8, 2026',
-      'status': 'Processing',
-      'items': [
-        {
-          'name': 'Cotton Dress',
-          'image': 'https://picsum.photos/seed/dress1/200/200',
-          'qty': 1,
-          'price': 39.99,
-        },
-        {
-          'name': 'Leather Belt',
-          'image': 'https://picsum.photos/seed/belt1/200/200',
-          'qty': 1,
-          'price': 39.99,
-        },
-      ],
-      'total': 79.98,
-    },
-    {
-      'id': '#TC-2024004',
-      'date': 'June 13, 2026',
-      'status': 'Delivered',
-      'items': [
-        {
-          'name': 'Wireless Earbuds',
-          'image': 'https://picsum.photos/seed/earbuds1/200/200',
-          'qty': 1,
-          'price': 89.99,
-        },
-      ],
-      'total': 89.99,
-    },
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
   List<Map<String, dynamic>> _filterList(List<Map<String, dynamic>> list) {
     if (_activeTab == 0) return list;
-    if (_activeTab == 7)
+    if (_activeTab == 6) // To Review — delivered orders to review
       return list.where((o) => o['status'] == 'Delivered').toList();
+    if (_activeTab == 2) // In Transit — both Shipping and On Delivery
+      return list
+          .where(
+            (o) => o['status'] == 'Shipping' || o['status'] == 'On Delivery',
+          )
+          .toList();
     final status = _tabs[_activeTab];
     return list.where((o) => o['status'] == status).toList();
+  }
+
+  List<Map<String, dynamic>> _searchList(List<Map<String, dynamic>> list) {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return list;
+    return list.where((o) {
+      final id = (o['id'] as String).toLowerCase();
+      if (id.contains(q)) return true;
+      final items = o['items'] as List;
+      for (final item in items) {
+        if (item is Map) {
+          final name = (item['name'] ?? '').toString().toLowerCase();
+          if (name.contains(q)) return true;
+        }
+      }
+      return false;
+    }).toList();
   }
 
   Color _statusColor(String status) {
@@ -124,8 +72,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'Delivered':
         return AppTheme.successColor;
       case 'On Delivery':
-        return Colors.blue;
       case 'Shipping':
+      case 'In Transit':
         return AppTheme.primaryColor;
       case 'Processing':
         return Colors.amber;
@@ -145,11 +93,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'On Delivery':
         return Icons.delivery_dining;
       case 'Shipping':
+      case 'In Transit':
         return Icons.local_shipping;
       case 'Processing':
         return Icons.hourglass_top;
       case 'Cancelled':
         return Icons.cancel;
+      case 'Return Requested':
+        return Icons.assignment_return;
       default:
         return Icons.schedule;
     }
@@ -222,17 +173,70 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: const Text('My Orders'),
         actions: [
-          if (_activeTab == 4 || _activeTab == 5 || _activeTab == 6)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Clear ${_tabs[_activeTab]}',
-              onPressed: _clearAllInTab,
+          // 3-dot menu for dangerous actions
+          if (_activeTab == 3 || _activeTab == 4 || _activeTab == 5)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (v) {
+                if (v == 'clear') _clearAllInTab();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'clear',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.delete_sweep_outlined,
+                        size: 20,
+                        color: AppTheme.errorColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Clear ${_tabs[_activeTab]}',
+                        style: const TextStyle(color: AppTheme.errorColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
       ),
       body: Column(
         children: [
-          // Twitter-style tab bar
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Search orders by ID or product name...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                filled: true,
+                fillColor: isDark
+                    ? AppTheme.darkSurface2
+                    : const Color(0xFFF1F3F5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Tab bar
           Container(
             width: double.infinity,
             margin: const EdgeInsets.only(bottom: 8),
@@ -295,6 +299,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           // Order list — real-time stream
           Expanded(
+            key: ValueKey(_activeTab),
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestoreService.getOrdersStream(),
               builder: (ctx, snapshot) {
@@ -324,59 +329,68 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     };
                   }).toList();
                 } else {
-                  // No Firestore data — show empty state
                   orders = [];
                 }
-                final filtered = _filterList(orders);
+                final filtered = _searchList(_filterList(orders));
 
                 if (filtered.isEmpty) {
-                  return _buildEmptyState(_tabs[_activeTab]);
+                  return _buildEmptyState(
+                    _tabs[_activeTab],
+                    _searchCtrl.text.isNotEmpty,
+                  );
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: filtered.length,
-                  itemBuilder: (ctx, i) {
-                    final o = filtered[i];
-                    final items = o['items'] as List;
-                    final status = o['status'] as String;
-                    final color = _statusColor(status);
-                    final card = _buildOrderCard(
-                      cardBg,
-                      isDark,
-                      o,
-                      items,
-                      status,
-                      color,
-                    );
-                    // Allow swipe-to-delete for cancelled orders
-                    if (status == 'Cancelled') {
-                      return Dismissible(
-                        key: Key(o['firestoreId'] ?? o['id'] as String),
-                        direction: DismissDirection.endToStart,
-                        confirmDismiss: (_) async {
-                          await _deleteOrder(o);
-                          return true;
-                        },
-                        background: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 24),
-                          decoration: BoxDecoration(
-                            color: AppTheme.errorColor,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        child: card,
-                      );
-                    }
-                    return card;
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    // Stream auto-refreshes; just wait briefly
+                    await Future.delayed(const Duration(milliseconds: 500));
                   },
+                  color: AppTheme.primaryColor,
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (ctx, i) {
+                      final o = filtered[i];
+                      final items = o['items'] as List;
+                      final status = o['status'] as String;
+                      final color = _statusColor(status);
+                      final card = _buildOrderCard(
+                        cardBg,
+                        isDark,
+                        o,
+                        items,
+                        status,
+                        color,
+                      );
+                      if (status == 'Cancelled') {
+                        return Dismissible(
+                          key: Key(o['firestoreId'] ?? o['id'] as String),
+                          direction: DismissDirection.endToStart,
+                          confirmDismiss: (_) async {
+                            await _deleteOrder(o);
+                            return true;
+                          },
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.errorColor,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          child: card,
+                        );
+                      }
+                      return card;
+                    },
+                  ),
                 );
               },
             ),
@@ -433,10 +447,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
-              Get.back();
+              Navigator.of(context).pop();
               _firestoreService
                   .requestReturn(
                     fid,
@@ -524,52 +541,58 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  Widget _buildEmptyState(String tab) {
+  Widget _buildEmptyState(String tab, bool isSearchResult) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    String icon;
+    IconData icon;
     String title;
     String subtitle;
     switch (tab) {
       case 'To Review':
-        icon = '⭐';
+        icon = Icons.rate_review_outlined;
         title = 'Nothing to review';
         subtitle = 'Delivered orders will appear here for you to rate.';
         break;
       case 'Processing':
-        icon = '📦';
+        icon = Icons.inventory_2_outlined;
         title = 'No processing orders';
         subtitle = 'Orders being prepared will show up here.';
         break;
-      case 'Shipping':
-        icon = '🚚';
-        title = 'No shipped orders';
-        subtitle = 'Orders on the way will appear here.';
+      case 'In Transit':
+        icon = Icons.local_shipping_outlined;
+        title = 'No orders in transit';
+        subtitle = 'Shipped orders on the way will appear here.';
         break;
       case 'Delivered':
-        icon = '✅';
+        icon = Icons.check_circle_outline;
         title = 'No delivered orders';
         subtitle = 'Completed orders will show up here.';
         break;
       case 'Return Requested':
-        icon = '↩️';
+        icon = Icons.assignment_return_outlined;
         title = 'No return requests';
         subtitle = 'Return requests will appear here.';
         break;
       case 'Cancelled':
-        icon = '🗑️';
+        icon = Icons.cancel_outlined;
         title = 'No cancelled orders';
         subtitle = 'Cancelled orders will appear here.';
         break;
       default:
-        icon = '🛍️';
-        title = 'No orders yet';
-        subtitle = 'Start shopping to see your orders!';
+        icon = Icons.shopping_bag_outlined;
+        title = isSearchResult ? 'No matching orders' : 'No orders yet';
+        subtitle = isSearchResult
+            ? 'Try a different search term.'
+            : 'Start shopping to see your orders!';
     }
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 56)),
+          Icon(
+            icon,
+            size: 56,
+            color: isDark ? Colors.white38 : Colors.grey.shade400,
+          ),
           const SizedBox(height: 16),
           Text(
             title,
@@ -609,6 +632,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
     String status,
     Color color,
   ) {
+    // First item name for quick identification
+    final firstItemName = items.isNotEmpty && items.first is Map
+        ? (items.first['name'] ?? items.first['title'] ?? '')
+        : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -623,6 +651,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -643,7 +672,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       Icon(_statusIcon(status), size: 14, color: color),
                       const SizedBox(width: 5),
                       Text(
-                        status,
+                        status == 'Shipping' ? 'In Transit' : status,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -665,10 +694,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ),
+          // First item name
+          if (firstItemName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              child: Text(
+                firstItemName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600,
+                ),
+              ),
+            ),
+          // 4-segment progress bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
-              children: List.generate(3, (j) {
+              children: List.generate(4, (j) {
                 final filled = j < _statusStep(status);
                 return Expanded(
                   child: Container(
@@ -694,25 +738,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     .map(
                       (item) => Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            color: isDark
-                                ? AppTheme.darkSurface2
-                                : const Color(0xFFF1F3F5),
-                            child: Image.network(
-                              item['image'] as String,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.image_outlined,
-                                size: 24,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
+                        child: _buildItemThumbnail(item, isDark),
                       ),
                     ),
                 if (items.length > 3)
@@ -770,7 +796,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  // Cancel return request
                   if (status == 'Return Requested')
                     TextButton.icon(
                       onPressed: () => _cancelReturn(o),
@@ -784,7 +809,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         style: TextStyle(fontSize: 12, color: Colors.orange),
                       ),
                     ),
-                  // Cancel button for Processing orders
                   if (status == 'Processing')
                     TextButton.icon(
                       onPressed: () => _cancelOrderFromList(o),
@@ -801,21 +825,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ),
                       ),
                     ),
-                  // Confirm Arrival for On Delivery
-                  if (status == 'On Delivery')
+                  if (status == 'Shipping' || status == 'On Delivery')
                     TextButton.icon(
                       onPressed: () => _confirmArrival(o),
                       icon: const Icon(
                         Icons.check_circle_outline,
                         size: 16,
-                        color: Colors.blue,
+                        color: AppTheme.primaryColor,
                       ),
                       label: const Text(
                         'Confirm Arrival',
-                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
                     ),
-                  // Return Request for Delivered orders
                   if (status == 'Delivered')
                     TextButton.icon(
                       onPressed: () => _requestReturn(o),
@@ -829,40 +854,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         style: TextStyle(fontSize: 12, color: Colors.orange),
                       ),
                     ),
-                  // Review buttons for Delivered orders — navigate to product
+                  // Inline review — opens rating dialog directly
                   if (status == 'Delivered')
                     TextButton.icon(
-                      onPressed: () {
-                        final raw = o['items'];
-                        if (raw is! List || raw.isEmpty) return;
-                        final pc = Get.find<ProductController>();
-                        // Try each item until a valid product is found
-                        for (final item in raw) {
-                          if (item is! Map) continue;
-                          final pid = (item['productId'] as String?) ?? '';
-                          if (pid.isNotEmpty) {
-                            final product = pc.getProductById(pid);
-                            if (product != null) {
-                              Get.toNamed(
-                                AppRoutes.productDetail,
-                                arguments: product,
-                              );
-                              return;
-                            }
-                          }
-                        }
-                        // Fallback: navigate to first item's product detail
-                        final first = raw.first as Map;
-                        Get.toNamed(
-                          AppRoutes.productDetail,
-                          arguments: {
-                            'id': first['productId'] ?? '',
-                            'name':
-                                first['name'] ?? first['title'] ?? 'Product',
-                            'image': first['image'] ?? '',
-                          },
-                        );
-                      },
+                      onPressed: () => _showInlineReviewDialog(o),
                       icon: const Icon(
                         Icons.star_outline,
                         size: 16,
@@ -901,6 +896,216 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showInlineReviewDialog(Map<String, dynamic> o) {
+    final auth = Get.find<AuthController>();
+    if (!auth.isLoggedIn.value) {
+      AppSnack.error('Login Required', 'Please log in to write a review.');
+      return;
+    }
+    final raw = o['items'];
+    if (raw is! List || raw.isEmpty) return;
+    final firstItem = raw.first as Map;
+    final productId = (firstItem['productId'] as String?) ?? '';
+    final productName =
+        (firstItem['name'] ?? firstItem['title'] ?? 'Product') as String;
+    final storedImage = (firstItem['image'] as String?) ?? '';
+
+    // Try live product image first
+    String productImage = storedImage;
+    if (productId.isNotEmpty) {
+      try {
+        final pc = Get.find<ProductController>();
+        final product = pc.getProductById(productId);
+        if (product != null && product.images.isNotEmpty) {
+          productImage = product.images[0];
+        }
+      } catch (_) {}
+    }
+
+    double rating = 5;
+    final commentCtrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Column(
+            children: [
+              if (productImage.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    productImage,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Text(
+                'Rate $productName',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'How would you rate this product?',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    return GestureDetector(
+                      onTap: () => setD(() => rating = i + 1.0),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Icon(
+                          i < rating.round()
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 36,
+                          color: AppTheme.secondaryColor,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: commentCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Share your experience (optional)...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: isDark
+                        ? AppTheme.darkInputFill
+                        : AppTheme.lightInputFill,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await _firestoreService.addReview(
+                    productId: productId,
+                    rating: rating,
+                    comment: commentCtrl.text.trim(),
+                    userName: auth.userName.value.isNotEmpty
+                        ? auth.userName.value
+                        : 'Chicken Lover',
+                    userAvatar:
+                        (auth.userPhotoURL.value.isNotEmpty &&
+                            auth.userPhotoURL.value.startsWith('http'))
+                        ? auth.userPhotoURL.value
+                        : '',
+                  );
+                  AppSnack.success(
+                    'Thanks!',
+                    'Your review has been submitted.',
+                  );
+                } catch (e) {
+                  AppSnack.error('Oops', 'Could not submit review.');
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemThumbnail(dynamic item, bool isDark) {
+    final productId = (item is Map ? (item['productId'] ?? '') : '').toString();
+    final imageUrl = (item is Map ? (item['image'] ?? '') : '').toString();
+
+    // Try to get live product image from controller
+    String? liveImage;
+    if (productId.isNotEmpty) {
+      try {
+        final pc = Get.find<ProductController>();
+        final product = pc.getProductById(productId);
+        if (product != null && product.images.isNotEmpty) {
+          liveImage = product.images[0];
+        }
+      } catch (_) {}
+    }
+    final displayImage = liveImage ?? imageUrl;
+
+    Widget thumbnail = ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 52,
+        height: 52,
+        color: isDark ? AppTheme.darkSurface2 : const Color(0xFFF1F3F5),
+        child: displayImage.isNotEmpty && displayImage.startsWith('http')
+            ? Image.network(
+                displayImage,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.image_outlined,
+                  size: 24,
+                  color: Colors.grey,
+                ),
+              )
+            : const Icon(Icons.image_outlined, size: 24, color: Colors.grey),
+      ),
+    );
+
+    // Make tappable if we have a product ID
+    if (productId.isNotEmpty) {
+      return GestureDetector(
+        onTap: () => _navigateToProduct(productId, item),
+        child: thumbnail,
+      );
+    }
+    return thumbnail;
+  }
+
+  void _navigateToProduct(String productId, dynamic item) {
+    final pc = Get.find<ProductController>();
+    final product = pc.getProductById(productId);
+    if (product != null) {
+      Get.toNamed(AppRoutes.productDetail, arguments: product);
+      return;
+    }
+    // Fallback: navigate with what we have
+    final name =
+        (item is Map ? (item['name'] ?? item['title'] ?? 'Product') : 'Product')
+            .toString();
+    final image = (item is Map ? (item['image'] ?? '') : '').toString();
+    Get.toNamed(
+      AppRoutes.productDetail,
+      arguments: {'id': productId, 'name': name, 'image': image},
     );
   }
 
@@ -961,220 +1166,6 @@ class _AddressesScreenState extends State<AddressesScreen> {
     });
   }
 
-  void _showAddressDialog({int? index}) {
-    final isEdit = index != null;
-    final existing = isEdit ? _addresses[index] : null;
-    final recipientCtrl = TextEditingController(
-      text: existing?['recipient'] ?? '',
-    );
-    final phoneCtrl = TextEditingController(text: existing?['phone'] ?? '');
-    final labelCtrl = TextEditingController(text: existing?['label'] ?? '');
-    final streetCtrl = TextEditingController(text: existing?['street'] ?? '');
-    final cityCtrl = TextEditingController(text: existing?['city'] ?? '');
-    final provinceCtrl = TextEditingController(
-      text: existing?['province'] ?? '',
-    );
-    final zipCtrl = TextEditingController(text: existing?['zip'] ?? '');
-    var isDefault = existing?['isDefault'] == true || _addresses.isEmpty;
-    var saving = false;
-
-    Get.dialog(
-      StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            isEdit ? 'Edit Address' : 'New Address',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _field(
-                        recipientCtrl,
-                        'Recipient Name',
-                        Icons.person_outlined,
-                        maxLength: 50,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _field(
-                        phoneCtrl,
-                        'Phone Number',
-                        Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(15),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  labelCtrl,
-                  'Label (Home, Office, etc.)',
-                  Icons.label_outlined,
-                  maxLength: 30,
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  streetCtrl,
-                  'Street Address',
-                  Icons.location_on_outlined,
-                  keyboardType: TextInputType.streetAddress,
-                  maxLines: 2,
-                  maxLength: 100,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _field(
-                        cityCtrl,
-                        'City',
-                        Icons.location_city_outlined,
-                        maxLength: 50,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _field(
-                        provinceCtrl,
-                        'Province/State',
-                        Icons.map_outlined,
-                        maxLength: 50,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _field(
-                  zipCtrl,
-                  'Postal Code',
-                  Icons.markunread_mailbox_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Set as default address',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  value: isDefault,
-                  onChanged: (v) => setD(() => isDefault = v),
-                  activeColor: AppTheme.primaryColor,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Get.back(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      if (recipientCtrl.text.trim().isEmpty ||
-                          streetCtrl.text.trim().isEmpty ||
-                          cityCtrl.text.trim().isEmpty) {
-                        AppSnack.error(
-                          'Required',
-                          'Please fill recipient, street, and city.',
-                        );
-                        return;
-                      }
-                      setD(() => saving = true);
-                      final addr = {
-                        'firestoreId': isEdit
-                            ? existing!['firestoreId'] ?? ''
-                            : '',
-                        'recipient': recipientCtrl.text.trim(),
-                        'phone': phoneCtrl.text.trim(),
-                        'label': labelCtrl.text.trim().isEmpty
-                            ? 'Address'
-                            : labelCtrl.text.trim(),
-                        'street': streetCtrl.text.trim(),
-                        'city': cityCtrl.text.trim(),
-                        'province': provinceCtrl.text.trim(),
-                        'zip': zipCtrl.text.trim(),
-                        'isDefault': isDefault,
-                      };
-                      try {
-                        if (isEdit &&
-                            (addr['firestoreId'] as String).isNotEmpty) {
-                          await _firestoreService.saveAddress(
-                            addr,
-                            docId: addr['firestoreId'] as String,
-                          );
-                        } else {
-                          await _firestoreService.saveAddress(addr);
-                        }
-                        Get.back();
-                        _loadAddresses();
-                        AppSnack.success(
-                          'Saved',
-                          isEdit ? 'Address updated.' : 'Address added.',
-                        );
-                      } catch (_) {
-                        setD(() => saving = false);
-                        AppSnack.error('Error', 'Could not save address.');
-                      }
-                    },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
-              child: Text(saving ? 'Saving...' : (isEdit ? 'Update' : 'Save')),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field(
-    TextEditingController ctrl,
-    String label,
-    IconData icon, {
-    TextInputType? keyboardType,
-    int maxLines = 1,
-    int? maxLength,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      inputFormatters: inputFormatters,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        counterText: '',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 14,
-        ),
-        isDense: true,
-      ),
-    );
-  }
-
   void _deleteAddress(int index) {
     final addr = _addresses[index];
     final docId = addr['firestoreId'] as String?;
@@ -1224,10 +1215,17 @@ class _AddressesScreenState extends State<AddressesScreen> {
     switch (label.toLowerCase()) {
       case 'home':
         return Icons.home_rounded;
+      case 'work':
       case 'office':
         return Icons.business_rounded;
-      case 'work':
-        return Icons.work_rounded;
+      case 'school':
+        return Icons.school_rounded;
+      case 'apartment':
+        return Icons.apartment_rounded;
+      case 'family':
+        return Icons.family_restroom_rounded;
+      case 'friend':
+        return Icons.people_rounded;
       default:
         return Icons.location_on_rounded;
     }
@@ -1518,46 +1516,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       });
     }
   }
-
-  List<Map<String, dynamic>> _mockCards() => [
-    {
-      'firestoreId': 'mock1',
-      'number': '4242424242424242',
-      'holder': 'SENG HAMKI',
-      'expiry': '12/27',
-      'brand': 'visa',
-      'isDefault': true,
-    },
-    {
-      'firestoreId': 'mock2',
-      'number': '5555555555554444',
-      'holder': 'SENG HAMKI',
-      'expiry': '06/26',
-      'brand': 'mastercard',
-      'isDefault': false,
-    },
-  ];
-
-  List<Map<String, dynamic>> _mockBanks() => [
-    {
-      'firestoreId': 'bank_mock1',
-      'bankName': 'ABA Bank',
-      'accountHolder': 'SENG HAMKI',
-      'accountNumber': '00123456789',
-      'routingNumber': '',
-      'accountType': 'checking',
-      'isDefault': true,
-    },
-    {
-      'firestoreId': 'bank_mock2',
-      'bankName': 'ACLEDA Bank',
-      'accountHolder': 'SENG HAMKI',
-      'accountNumber': '98765432100',
-      'routingNumber': '',
-      'accountType': 'savings',
-      'isDefault': false,
-    },
-  ];
 
   IconData _brandIcon(String brand) {
     switch (brand) {

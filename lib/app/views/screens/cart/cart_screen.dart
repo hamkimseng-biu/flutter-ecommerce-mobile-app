@@ -122,16 +122,20 @@ class CartScreen extends StatelessWidget {
                                 color: AppTheme.primaryColor,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                firstItem.sellerName.isNotEmpty
-                                    ? firstItem.sellerName
-                                    : 'Tiny Chicken',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              ),
+                              Obx(() {
+                                final seller = Get.find<ProductController>()
+                                    .getSellerById(sellerId);
+                                final name =
+                                    seller?.name ?? firstItem.sellerName;
+                                return Text(
+                                  name.isNotEmpty ? name : 'Tiny Chicken',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                );
+                              }),
                               const SizedBox(width: 4),
                               const Icon(
                                 Icons.chevron_right,
@@ -282,16 +286,55 @@ class CartScreen extends StatelessWidget {
                                         const SizedBox(height: 6),
                                         Row(
                                           children: [
-                                            Obx(
-                                              () => Text(
-                                                curCtrl.formatPrice(item.price),
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppTheme.primaryColor,
-                                                ),
-                                              ),
-                                            ),
+                                            Obx(() {
+                                              final pc =
+                                                  Get.find<ProductController>();
+                                              final currentPrice = pc
+                                                  .getProductById(
+                                                    item.productId,
+                                                  )
+                                                  ?.effectivePrice;
+                                              final updated =
+                                                  currentPrice != null &&
+                                                  (currentPrice - item.price)
+                                                          .abs() >
+                                                      0.01;
+                                              return Row(
+                                                children: [
+                                                  Text(
+                                                    curCtrl.formatPrice(
+                                                      updated
+                                                          ? currentPrice
+                                                          : item.price,
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppTheme.primaryColor,
+                                                    ),
+                                                  ),
+                                                  if (updated) ...[
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      curCtrl.formatPrice(
+                                                        item.price,
+                                                      ),
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: isDark
+                                                            ? Colors.white38
+                                                            : Colors.grey,
+                                                        decoration:
+                                                            TextDecoration
+                                                                .lineThrough,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              );
+                                            }),
                                             const Spacer(),
                                             Container(
                                               decoration: BoxDecoration(
@@ -465,7 +508,9 @@ class CartScreen extends StatelessWidget {
                             : const Color(0xFFE0E0E0),
                         disabledForegroundColor:
                             Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF9E9EAA)
+                            ? (isDark
+                                  ? Colors.white38
+                                  : const Color(0xFF9E9EAA))
                             : const Color(0xFF999999),
                       ),
                       child: Text(

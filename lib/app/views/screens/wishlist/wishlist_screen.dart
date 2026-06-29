@@ -68,10 +68,13 @@ class WishlistScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Tap the heart on any product to save it here for later.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Color(0xFF9E9EAA)),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white54 : const Color(0xFF9E9EAA),
+                    ),
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(
@@ -102,9 +105,9 @@ class WishlistScreen extends StatelessWidget {
                 children: [
                   Text(
                     '${wc.wishlistItems.length} ${wc.wishlistItems.length == 1 ? 'item' : 'items'} saved',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF9E9EAA),
+                      color: isDark ? Colors.white54 : const Color(0xFF9E9EAA),
                     ),
                   ),
                   const Spacer(),

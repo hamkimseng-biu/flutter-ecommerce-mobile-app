@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
@@ -98,6 +99,10 @@ class ProductController extends GetxController {
     return related.take(6).toList();
   }
 
+  StreamSubscription<List<ProductModel>>? _productsSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _catsSub;
+  StreamSubscription<QuerySnapshot>? _sellersSub;
+
   @override
   void onInit() {
     super.onInit();
@@ -105,10 +110,18 @@ class ProductController extends GetxController {
     _loadFromStream();
   }
 
+  @override
+  void onClose() {
+    _productsSub?.cancel();
+    _catsSub?.cancel();
+    _sellersSub?.cancel();
+    super.onClose();
+  }
+
   void _loadFromStream() {
     isLoading.value = true;
 
-    _firestoreService.getProductsStream().listen(
+    _productsSub = _firestoreService.getProductsStream().listen(
       (products) {
         if (products.isNotEmpty) {
           allProducts.value = products;
@@ -122,8 +135,7 @@ class ProductController extends GetxController {
       },
     );
 
-    // Listen to categories from Firestore collection (admin-managed)
-    _firestoreService.getCategoriesStream().listen((cats) {
+    _catsSub = _firestoreService.getCategoriesStream().listen((cats) {
       categories.value = [
         CategoryModel(id: 'all', name: 'All', icon: '🛍️'),
         ...cats.map(
@@ -156,28 +168,37 @@ class ProductController extends GetxController {
   }
 
   void _loadSellers() {
-    FirebaseFirestore.instance.collection('shops').snapshots().listen((snap) {
-      if (snap.docs.isEmpty) {
-        sellers.value = MockDataService.getSellers();
-        return;
-      }
-      sellers.value = snap.docs.map((doc) {
-        final d = doc.data();
-        return SellerModel(
-          id: doc.id,
-          name: d['name'] ?? 'Shop',
-          avatar: d['logoUrl'] ?? d['avatar'] ?? '🏪',
-          logoUrl: d['logoUrl'] ?? '',
-          banner: d['bannerUrl'] ?? '',
-          description: d['description'] ?? '',
-          rating: (d['rating'] ?? 0.0).toDouble(),
-          productCount: 0,
-          followerCount: (d['followerCount'] ?? 0) as int,
-          isOfficial: d['isOfficial'] ?? false,
-          isPopular: d['isPopular'] ?? false,
-        );
-      }).toList();
-    });
+    _sellersSub?.cancel();
+    _sellersSub = FirebaseFirestore.instance
+        .collection('shops')
+        .snapshots()
+        .listen((snap) {
+          if (snap.docs.isEmpty) {
+            sellers.value = MockDataService.getSellers();
+            return;
+          }
+          sellers.value = snap.docs.map((doc) {
+            final d = doc.data();
+            final raw = (d['followerCount'] ?? 0) as int;
+            // Auto-fix any negative followerCount persisted in Firestore
+            if (raw < 0) {
+              doc.reference.update({'followerCount': 0});
+            }
+            return SellerModel(
+              id: doc.id,
+              name: d['name'] ?? 'Shop',
+              avatar: d['logoUrl'] ?? d['avatar'] ?? '🏪',
+              logoUrl: d['logoUrl'] ?? '',
+              banner: d['bannerUrl'] ?? '',
+              description: d['description'] ?? '',
+              rating: (d['rating'] ?? 0.0).toDouble(),
+              productCount: 0,
+              followerCount: raw.clamp(0, 999999999),
+              isOfficial: d['isOfficial'] ?? false,
+              isPopular: d['isPopular'] ?? false,
+            );
+          }).toList();
+        });
   }
 
   /// Only sellers marked as popular by admin
@@ -186,7 +207,9 @@ class ProductController extends GetxController {
 
   void _categorizeProducts(List<ProductModel> products) {
     featuredProducts.value = products.where((p) => p.isFeatured).toList();
-    flashSaleProducts.value = products.where((p) => p.isFlashSale).toList();
+    flashSaleProducts.value = products
+        .where((p) => p.isFlashSaleActive)
+        .toList();
     // New arrivals: sort by index (or use a createdAt field in Firestore)
     newArrivals.value = products.take(10).toList();
     trendingProducts.value = products.where((p) => p.soldCount > 50).toList();

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../config/app_theme.dart';
 import '../../../models/review_model.dart';
+import '../../../services/firebase_firestore_service.dart';
+import '../../../services/time_service.dart';
 
 class AllReviewsScreen extends StatefulWidget {
   final String productId;
@@ -17,82 +18,9 @@ class AllReviewsScreen extends StatefulWidget {
 }
 
 class _AllReviewsScreenState extends State<AllReviewsScreen> {
-  final _firestore = FirebaseFirestore.instance;
-  final _scrollCtrl = ScrollController();
-
-  List<ReviewModel> _reviews = [];
-  DocumentSnapshot? _lastDoc;
-  bool _loading = true;
-  bool _loadingMore = false;
-  bool _hasMore = true;
-  static const _pageSize = 20;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFirstPage();
-    _scrollCtrl.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollCtrl.position.pixels >=
-            _scrollCtrl.position.maxScrollExtent - 200 &&
-        !_loadingMore &&
-        _hasMore) {
-      _loadMore();
-    }
-  }
-
-  Future<void> _loadFirstPage() async {
-    setState(() => _loading = true);
-    try {
-      final query = await _firestore
-          .collection('products')
-          .doc(widget.productId)
-          .collection('reviews')
-          .orderBy('createdAt', descending: true)
-          .limit(_pageSize)
-          .get();
-
-      _reviews = query.docs.map((d) => ReviewModel.fromFirestore(d)).toList();
-      _lastDoc = query.docs.isNotEmpty ? query.docs.last : null;
-      _hasMore = query.docs.length >= _pageSize;
-      setState(() => _loading = false);
-    } catch (_) {
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _lastDoc == null) return;
-    setState(() => _loadingMore = true);
-    try {
-      final query = await _firestore
-          .collection('products')
-          .doc(widget.productId)
-          .collection('reviews')
-          .orderBy('createdAt', descending: true)
-          .startAfterDocument(_lastDoc!)
-          .limit(_pageSize)
-          .get();
-
-      final newReviews = query.docs
-          .map((d) => ReviewModel.fromFirestore(d))
-          .toList();
-      _reviews.addAll(newReviews);
-      _lastDoc = query.docs.isNotEmpty ? query.docs.last : _lastDoc;
-      _hasMore = query.docs.length >= _pageSize;
-      setState(() => _loadingMore = false);
-    } catch (_) {
-      setState(() => _loadingMore = false);
-    }
-  }
+  final _firestoreService = FirebaseFirestoreService();
+  int? _starFilter;
+  String _sortBy = 'newest';
 
   @override
   Widget build(BuildContext context) {
@@ -117,12 +45,19 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
           ],
         ),
       ),
-      body: _loading
-          ? const Center(
+      body: StreamBuilder<List<ReviewModel>>(
+        stream: _firestoreService.getReviewsStream(widget.productId),
+        builder: (ctx, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
               child: CircularProgressIndicator(color: AppTheme.primaryColor),
-            )
-          : _reviews.isEmpty
-          ? Center(
+            );
+          }
+
+          final allReviews = snapshot.data ?? [];
+
+          if (allReviews.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -143,28 +78,326 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
                   ),
                 ],
               ),
-            )
-          : ListView.builder(
-              controller: _scrollCtrl,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-              itemCount: _reviews.length + (_hasMore ? 1 : 0),
-              itemBuilder: (ctx, i) {
-                if (i == _reviews.length) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppTheme.primaryColor,
+            );
+          }
+
+          // Compute stats from ALL reviews (including text-less)
+          final dist = _computeDistribution(allReviews);
+          final avg = allReviews.isEmpty
+              ? 0.0
+              : allReviews.map((r) => r.rating).reduce((a, b) => a + b) /
+                    allReviews.length;
+
+          // Filter & sort (only reviews WITH comments for display)
+          var reviews = allReviews.where((r) => r.comment.isNotEmpty).toList();
+
+          if (_starFilter != null) {
+            reviews = reviews
+                .where((r) => r.rating.round() == _starFilter)
+                .toList();
+          }
+          switch (_sortBy) {
+            case 'highest':
+              reviews.sort((a, b) => b.rating.compareTo(a.rating));
+              break;
+            case 'lowest':
+              reviews.sort((a, b) => a.rating.compareTo(b.rating));
+              break;
+            default:
+              reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              break;
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+            children: [
+              // ── Summary card ──
+              _buildSummaryCard(avg, allReviews.length, dist, surface2, isDark),
+              const SizedBox(height: 12),
+
+              // ── Sort ──
+              if (allReviews.length > 1) ...[
+                _buildSortRow(isDark),
+                const SizedBox(height: 8),
+              ],
+
+              // ── Filter chip ──
+              if (_starFilter != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Chip(
+                    label: Text(
+                      '${_starFilter}★ only',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white : const Color(0xFF5D4037),
                       ),
                     ),
-                  );
-                }
-                final r = _reviews[i];
-                return _buildReviewCard(r, surface2);
-              },
-            ),
+                    deleteIcon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: isDark ? Colors.white70 : const Color(0xFF5D4037),
+                    ),
+                    onDeleted: () => setState(() => _starFilter = null),
+                    backgroundColor: AppTheme.secondaryColor.withValues(
+                      alpha: isDark ? 0.35 : 0.15,
+                    ),
+                    side: BorderSide.none,
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+
+              // ── Stats note ──
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  '${reviews.length} written ${reviews.length == 1 ? 'review' : 'reviews'}'
+                  '${allReviews.where((r) => r.comment.isEmpty).length > 0 ? ' · ${allReviews.where((r) => r.comment.isEmpty).length} rating-only' : ''}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : const Color(0xFF9E9EAA),
+                  ),
+                ),
+              ),
+
+              // ── Review cards ──
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: reviews.isEmpty
+                    ? Container(
+                        key: const ValueKey('empty'),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: surface2,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'No written reviews match this filter',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF9E9EAA),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Column(
+                        key: const ValueKey('list'),
+                        children: reviews
+                            .map((r) => _buildReviewCard(r, surface2))
+                            .toList(),
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
     );
+  }
+
+  Widget _buildSummaryCard(
+    double avg,
+    int total,
+    Map<int, int> dist,
+    Color surface2,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface2,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  avg.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(
+                    5,
+                    (i) => Icon(
+                      i < avg.round()
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 12,
+                      color: AppTheme.secondaryColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$total ${total == 1 ? 'review' : 'reviews'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : const Color(0xFF9E9EAA),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              children: List.generate(5, (i) {
+                final star = 5 - i;
+                final count = dist[star] ?? 0;
+                final pct = total > 0 ? count / total : 0.0;
+                final active = _starFilter == star;
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    _starFilter = _starFilter == star ? null : star;
+                  }),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          child: Text(
+                            '$star★',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: active
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: active
+                                  ? AppTheme.secondaryColor
+                                  : (isDark ? Colors.white54 : Colors.grey),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: 6,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(3),
+                              color: active
+                                  ? AppTheme.secondaryColor
+                                  : (isDark
+                                        ? Colors.white12
+                                        : Colors.grey.shade300),
+                            ),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: pct.clamp(0.0, 1.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(3),
+                                  color: active
+                                      ? AppTheme.secondaryColor
+                                      : AppTheme.secondaryColor.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 24,
+                          child: Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.white38 : Colors.grey,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortRow(bool isDark) {
+    final options = {
+      'newest': 'Newest',
+      'highest': 'Highest',
+      'lowest': 'Lowest',
+    };
+    return Row(
+      children: [
+        Text(
+          'Sort:',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white54 : Colors.grey,
+          ),
+        ),
+        const SizedBox(width: 6),
+        ...options.entries.map((e) {
+          final active = _sortBy == e.key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: GestureDetector(
+              onTap: () => setState(() => _sortBy = e.key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: active
+                      ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: active
+                        ? AppTheme.primaryColor.withValues(alpha: 0.4)
+                        : (isDark ? Colors.white12 : Colors.grey.shade300),
+                  ),
+                ),
+                child: Text(
+                  e.value,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                    color: active
+                        ? AppTheme.primaryColor
+                        : (isDark ? Colors.white54 : Colors.grey),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Map<int, int> _computeDistribution(List<ReviewModel> reviews) {
+    final map = <int, int>{5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+    for (final r in reviews) {
+      final star = r.rating.round().clamp(1, 5);
+      map[star] = (map[star] ?? 0) + 1;
+    }
+    return map;
   }
 
   Widget _buildReviewCard(ReviewModel r, Color surface2) {
@@ -258,17 +491,15 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
               ),
             ],
           ),
-          if (r.comment.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(r.comment, style: const TextStyle(fontSize: 14, height: 1.5)),
-          ],
+          const SizedBox(height: 8),
+          Text(r.comment, style: const TextStyle(fontSize: 14, height: 1.5)),
         ],
       ),
     );
   }
 
   String _timeAgo(DateTime date) {
-    final diff = DateTime.now().difference(date);
+    final diff = TimeService().serverNow().difference(date);
     if (diff.inDays > 365) return '${diff.inDays ~/ 365}y ago';
     if (diff.inDays > 30) return '${diff.inDays ~/ 30}mo ago';
     if (diff.inDays > 0) return '${diff.inDays}d ago';

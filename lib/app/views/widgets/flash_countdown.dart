@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../services/time_service.dart';
 
 class FlashCountdown extends StatefulWidget {
   final DateTime endTime;
@@ -24,13 +25,13 @@ class _FlashCountdownState extends State<FlashCountdown> {
   @override
   void initState() {
     super.initState();
-    _remaining = widget.endTime.difference(DateTime.now());
+    _remaining = widget.endTime.difference(TimeService().serverNow());
     _tick();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
   void _tick() {
-    final diff = widget.endTime.difference(DateTime.now());
+    final diff = widget.endTime.difference(TimeService().serverNow());
     if (diff.isNegative) {
       _timer?.cancel();
       if (mounted) setState(() => _remaining = Duration.zero);

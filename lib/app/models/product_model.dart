@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/time_service.dart';
 
 class ProductModel {
   final String id;
@@ -68,12 +69,30 @@ class ProductModel {
     this.freeShipping = false,
   });
 
-  double get effectivePrice =>
-      isFlashSale && flashSalePrice > 0 ? flashSalePrice : price;
+  /// Whether the flash sale is currently active (not expired).
+  bool get isFlashSaleActive =>
+      isFlashSale &&
+      flashSalePrice > 0 &&
+      (saleEndsAt == null || saleEndsAt!.isAfter(TimeService().serverNow()));
 
-  double get discountPercentDisplay => originalPrice > 0
-      ? ((originalPrice - effectivePrice) / originalPrice * 100).roundToDouble()
-      : discountPercent;
+  double get effectivePrice {
+    if (isFlashSaleActive) return flashSalePrice;
+    if (discountPercent > 0 && discountPercent <= 100) {
+      // Round to 2 decimal places (cents), not whole dollars
+      return (price * (1 - discountPercent / 100) * 100).roundToDouble() / 100;
+    }
+    return price;
+  }
+
+  /// The admin-set discount percent. Use this for the badge display.
+  /// NOT computed from originalPrice/effectivePrice because that would
+  /// incorrectly combine regular discount + flash discount.
+  double get discountPercentDisplay => discountPercent;
+
+  /// The flash-only discount percent (off the current price).
+  double get flashDiscountPercent => isFlashSaleActive && price > 0
+      ? ((price - flashSalePrice) / price * 100).roundToDouble()
+      : 0.0;
 
   ProductModel copyWith({
     String? id,

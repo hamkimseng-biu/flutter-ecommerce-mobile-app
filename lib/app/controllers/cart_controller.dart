@@ -239,7 +239,7 @@ class CartController extends GetxController {
       discount.value = subtotal * (pct / 100.0);
       AppSnack.success(
         'Promo Applied!',
-        '${pct.toInt()}% discount applied to your order.',
+        '${pct.round()}% discount applied to your order.',
       );
     } else {
       promoCode.value = '';

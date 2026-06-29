@@ -77,6 +77,12 @@ class FcmService {
     final body = message.notification?.body ?? '';
     debugPrint('[FCM] Foreground: $title');
 
+    // Don't show snackbar if a dialog is open (would clash)
+    if (Get.isDialogOpen ?? false) {
+      _saveToHistory(title, body);
+      return;
+    }
+
     try {
       AppSnack.info(title, body);
     } catch (_) {}

@@ -211,7 +211,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: Image.asset(
-                      'assets/images/icon.png',
+                      'assets/logo/Chicken Logo.png',
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,

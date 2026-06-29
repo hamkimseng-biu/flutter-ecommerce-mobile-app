@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/product_model.dart';
 import '../../controllers/wishlist_controller.dart';
 import '../../controllers/currency_controller.dart';
+import '../../controllers/product_controller.dart';
 import '../../../config/app_theme.dart';
 
 class ProductCard extends StatelessWidget {
@@ -22,6 +23,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final wc = Get.find<WishlistController>();
+    final pc = Get.find<ProductController>();
     final bg = isDark ? AppTheme.darkSurface : Colors.white;
     // Currency controller — instantiate once at top of build
     final curCtrl = Get.find<CurrencyController>();
@@ -58,29 +60,28 @@ class ProductCard extends StatelessWidget {
                           : _ph(),
                     ),
                   ),
-                  if (product.discountPercentDisplay > 3)
+                  if (product.isFlashSaleActive)
                     Positioned(
                       top: 6,
                       left: 6,
                       child: _b(
-                        '-${product.discountPercentDisplay.toInt()}%',
-                        product.isFlashSale
-                            ? AppTheme.flashSaleColor
-                            : AppTheme.errorColor,
+                        product.flashDiscountPercent > 0
+                            ? 'FLASH -${product.flashDiscountPercent.round()}%'
+                            : 'FLASH',
+                        AppTheme.errorColor,
+                        icon: Icons.bolt,
+                        sz: 8,
                       ),
                     ),
-                  if (product.isFlashSale &&
-                      product.discountPercentDisplay <= 3)
+                  if (!product.isFlashSaleActive &&
+                      product.discountPercentDisplay > 3)
                     Positioned(
                       top: 6,
                       left: 6,
-                      child: _b('FLASH', Colors.amber, icon: Icons.bolt, sz: 8),
-                    ),
-                  if (product.isFlashSale && product.discountPercentDisplay > 3)
-                    Positioned(
-                      top: 22,
-                      left: 6,
-                      child: _b('FLASH', Colors.amber, icon: Icons.bolt, sz: 8),
+                      child: _b(
+                        '-${product.discountPercentDisplay.round()}%',
+                        Colors.amber,
+                      ),
                     ),
                   if (product.showSoldCount && product.soldCount > 1000)
                     Positioned(
@@ -167,17 +168,22 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        product.sellerName,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isDark
-                              ? AppTheme.darkTextSecondary
-                              : AppTheme.lightTextSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Obx(() {
+                        final sellerName =
+                            pc.getSellerById(product.sellerId)?.name ??
+                            product.sellerName;
+                        return Text(
+                          sellerName,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.lightTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }),
                       if (product.showRating)
                         Row(
                           children: [
@@ -231,13 +237,11 @@ class ProductCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (product.originalPrice > 0 &&
-                                  product.discountPercentDisplay > 0)
+                              if (product.discountPercentDisplay > 0 ||
+                                  product.isFlashSaleActive)
                                 Obx(
                                   () => Text(
-                                    curCtrl.formatPriceCompact(
-                                      product.originalPrice,
-                                    ),
+                                    curCtrl.formatPriceCompact(product.price),
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isDark

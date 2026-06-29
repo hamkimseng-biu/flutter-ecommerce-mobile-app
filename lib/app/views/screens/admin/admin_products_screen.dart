@@ -1453,14 +1453,32 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                uid.length > 16
-                                    ? '${uid.substring(0, 16)}...'
-                                    : uid,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              child: FutureBuilder<Map<String, dynamic>?>(
+                                future: _firestore
+                                    .collection('users')
+                                    .doc(uid)
+                                    .get()
+                                    .then((d) => d.exists ? d.data() : null),
+                                builder: (_, snap) {
+                                  final data = snap.data;
+                                  final name = data?['name'] as String?;
+                                  final email = data?['email'] as String?;
+                                  final display =
+                                      name ??
+                                      email ??
+                                      (uid.length > 16
+                                          ? '${uid.substring(0, 16)}...'
+                                          : uid);
+                                  return Text(
+                                    display,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             Text(

@@ -155,14 +155,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, __, ___) =>
                                               Image.asset(
-                                                'assets/images/icon.png',
+                                                'assets/logo/Chicken Logo.png',
                                                 width: 72,
                                                 height: 72,
                                                 fit: BoxFit.cover,
                                               ),
                                         )
                                       : Image.asset(
-                                          'assets/images/icon.png',
+                                          'assets/logo/Chicken Logo.png',
                                           width: 72,
                                           height: 72,
                                           fit: BoxFit.cover,
@@ -789,10 +789,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
           ElevatedButton(
             onPressed: () {
-              Get.back();
+              Navigator.of(context).pop();
               AppSnack.success(
                 'Message Sent',
                 "We'll get back to you within 24 hours.",
@@ -830,7 +833,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
-                  'assets/images/icon.png',
+                  'assets/logo/Chicken Logo.png',
                   width: 70,
                   height: 70,
                   fit: BoxFit.cover,
@@ -858,7 +861,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -935,11 +941,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
           ElevatedButton.icon(
             onPressed: () {
               AppSnack.success('Copied!', 'Referral code copied to clipboard.');
-              Get.back();
+              Navigator.of(context).pop();
             },
             icon: const Icon(Icons.copy, size: 16),
             label: const Text('Copy Code'),

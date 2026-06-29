@@ -27,7 +27,16 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   bool _isEdit = false;
   String? _existingId;
 
-  static const _labels = ['Home', 'Office', 'Other'];
+  static const _labels = [
+    'Home',
+    'Work',
+    'Office',
+    'School',
+    'Apartment',
+    'Family',
+    'Friend',
+    'Other',
+  ];
 
   @override
   void initState() {

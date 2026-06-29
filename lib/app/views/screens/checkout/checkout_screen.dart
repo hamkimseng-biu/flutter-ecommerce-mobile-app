@@ -124,11 +124,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ..._addresses.map(
               (a) => ListTile(
                 leading: Icon(
-                  a['label'] == 'Home'
-                      ? Icons.home_rounded
-                      : a['label'] == 'Office'
-                      ? Icons.business_rounded
-                      : Icons.location_on_rounded,
+                  _labelIcon(a['label'] ?? 'Other'),
                   color: _selectedAddress == a
                       ? AppTheme.primaryColor
                       : Colors.grey,
@@ -1099,6 +1095,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }),
     );
+  }
+
+  IconData _labelIcon(String label) {
+    switch (label.toLowerCase()) {
+      case 'home':
+        return Icons.home_rounded;
+      case 'work':
+      case 'office':
+        return Icons.business_rounded;
+      case 'school':
+        return Icons.school_rounded;
+      case 'apartment':
+        return Icons.apartment_rounded;
+      case 'family':
+        return Icons.family_restroom_rounded;
+      case 'friend':
+        return Icons.people_rounded;
+      default:
+        return Icons.location_on_rounded;
+    }
   }
 
   Widget _card(Color bg, Widget child) => Container(
